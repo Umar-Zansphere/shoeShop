@@ -147,11 +147,11 @@ model Product {
   id               String   @id @default(uuid())
   name             String   @db.VarChar(255)
   brand            String   @db.VarChar(255)
-  modelNumber      String?   @map("model_number") @db.VarChar(255)
+  modelNumber      String?  @map("model_number") @db.VarChar(255)
   category         Category
   gender           Gender
-  description      String?   @db.Text
-  shortDescription String?   @map("short_description")
+  description      String?  @db.Text
+  shortDescription String?  @map("short_description")
   tags             String[]
   isActive         Boolean  @default(true) @map("is_active")
   isFeatured       Boolean  @default(false) @map("is_featured")
@@ -164,14 +164,14 @@ model Product {
 }
 
 model ProductImage {
-  id        String   @id @default(uuid())
-  variantId  String
-  variant    ProductVariant @relation(fields: [variantId], references: [id])
+  id        String         @id @default(uuid())
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
   url       String
-  altText   String   @map("alt_text")
+  altText   String         @map("alt_text")
   position  Int
-  isPrimary Boolean  @default(false) @map("is_primary")
-  createdAt DateTime @default(now()) @map("created_at")
+  isPrimary Boolean        @default(false) @map("is_primary")
+  createdAt DateTime       @default(now()) @map("created_at")
 }
 
 model ProductVariant {

@@ -1,12 +1,13 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import cookieParser from "cookie-parser";
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const cookieParser = require('cookie-parser');
 
 dotenv.config();
 
-const app = express();
 
+const app = express();
+console.log("CLIENT_URL =", process.env.CLIENT_URL);
 app.use(cors({
   origin: process.env.CLIENT_URL || "http://localhost:3000",
   credentials: true
@@ -15,7 +16,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Import routes
-import apiRoutes from "./api/routes/index.js";
+const apiRoutes =require("./api/routes/index.js");
 
 // Mount API routes
 app.use("/api", apiRoutes);

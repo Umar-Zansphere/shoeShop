@@ -3,7 +3,7 @@
   const multerS3 = require("multer-s3");
   const crypto = require("crypto");
   const path = require("path");
-    const { validateAndOptimizeImage } = require('../utils/imageProcessor');
+    const { validateAndOptimizeImage } = require('../../utils/imageProcessor');
 
   const s3 = new S3Client({
     region: process.env.AWS_REGION,

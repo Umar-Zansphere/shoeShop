@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const useragent = require('express-useragent');
 const { sendEmail } = require('../../config/email');
+const { access } = require('fs');
 
 const generateTokens = (user) => {
   const roleName = user?.role || null;
@@ -12,13 +13,10 @@ const generateTokens = (user) => {
   const accessToken = jwt.sign({ id: user.id, role: roleName }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN,
   });
-  const refreshToken = jwt.sign({ id: user.id }, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN,
-  });
-  return { accessToken, refreshToken };
+  return { accessToken };
 };
 
-const createSession = async (userId, refreshToken, req) => {
+const createSession = async (userId, accessToken, req) => {
     const rawUA = req.headers['user-agent'] || 'Unknown UA';
     const parsedUA = useragent.parse(rawUA);
 
@@ -33,7 +31,7 @@ const createSession = async (userId, refreshToken, req) => {
     return prisma.userSession.create({
         data: {
             userId: userId,
-            refreshTokenHash: refreshToken, // This is the allowlist entry
+            refreshTokenHash: accessToken, // This is the allowlist entry
             deviceInfo: uaString, // 🔥 always a string
             ipAddress: req.ip || req.connection?.remoteAddress || null,
             expiresAt: expiresAt,
@@ -85,45 +83,14 @@ const login = async (email, password, req) => {
   if (!user.is_email_verified) {
     throw new Error('Please verify your email.');
   }
-  const {accessToken, refreshToken} = generateTokens(user);
-  // Get raw User-Agent from the request
-  const rawUA = req.headers['user-agent'] || 'Unknown User-Agent';
-
-  // Parse and stringify for readability
-  const parsedUA = useragent.parse(rawUA);
-  const uaString = `${parsedUA.browser} ${parsedUA.version} / ${parsedUA.os} ${parsedUA.platform}`;
-
-  const existingSession = await prisma.userSession.findFirst({
-    where: {
-      userId: user.id,
-      deviceInfo: uaString,
-    }
-  });
-
-  let session;
-    if (existingSession) {
-        // Update the existing session with the new refresh token
-        session = await prisma.userSession.update({
-            where: { id: existingSession.id },
-            data: { refreshTokenHash: refreshToken }
-        });
-    } else {
-        // Create a new session
-        session = await createSession(user.id, refreshToken, req);
-        console.log("New session created with ID:", session.id);
-        // Check if this is the user's very first session ever
-        const totalSessions = await prisma.userSession.count({
-            where: { userId: user.id },
-        });
-    }  
-
+  const {accessToken} = generateTokens(user);
     // Update last login time
     const updatedUser = await prisma.user.update({
         where: { id: user.id },
         data: { last_login_at: new Date() },
     });
 
-  return{accessToken, refreshToken, user: updatedUser };
+  return{accessToken, user: updatedUser };
 }
 
 const verifyEmail = async (token) => {
@@ -198,50 +165,6 @@ const resetPassword = async (token, password) => {
   return { message: 'Password reset successfully.' };
 };
 
-const refreshToken = async (req) => {
-  try {
-    const token = req.cookies.refreshToken;
-    console.log("🔍 Incoming refresh cookie:", token);
-
-    if (!token) throw new Error("No refresh token provided.");
-
-    // Verify JWT
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-      console.log("✅ Decoded refresh token:", decoded); 
-    } catch (err) {
-      console.error("❌ JWT verification failed:", err.message);
-      throw new Error("Invalid refresh token.");
-    }
-
-    // Check in DB
-    const session = await prisma.userSession.findUnique({
-      where: { refreshTokenHash: token },
-      include: { user: true },
-    });
-    console.log("📦 Session lookup result:", session);
-
-    if (!session) {
-      throw new Error("Session not found. Token revoked or not stored.");
-    }
-
-    // Issue new access token
-    const newAccessToken = jwt.sign(
-      { id: session.user.id, role: session.user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    );
-
-    console.log("✅ Issued new access token for user:", session.user.email);
-
-    return { accessToken: newAccessToken };
-  } catch (error) {
-    console.error("❌ Refresh token error:", error.message);
-    throw new Error("Invalid or expired refresh token.");
-  }
-};
-
 const changePassword = async (userId, oldPassword, newPassword, req) => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
 
@@ -263,15 +186,15 @@ const changePassword = async (userId, oldPassword, newPassword, req) => {
   return { message: 'Password changed successfully.' };
 };
 
-const logout = async (userId, refreshToken) => {
-  if (!refreshToken) {
+const logout = async (userId, accessToken) => {
+  if (!accessToken) {
         return { message: 'No session to revoke.' };
     }
     console.log("Revoking session for user ID:", userId);
-    console.log("With refresh token:", refreshToken);
+    console.log("With access token:", accessToken);
 
   const session = await prisma.userSession.findUnique({
-        where: { refreshTokenHash: refreshToken }
+        where: { refreshTokenHash: accessToken }
     });
     if (session) {
         await prisma.userSession.delete({ where: { id: session.id } });
@@ -546,13 +469,12 @@ const phoneSignupVerify = async (phoneNumber, otp) => {
     }
 
     // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user);
+    const { accessToken } = generateTokens(user);
 
     return {
       success: true,
       message: 'Phone verified successfully. Account created.',
       accessToken,
-      refreshToken,
       user: {
         id: user.id,
         phone: user.phone,
@@ -678,8 +600,8 @@ const phoneLoginVerify = async (phoneNumber, otp, req) => {
     });
 
     // Generate tokens and create session
-    const { accessToken, refreshToken } = generateTokens(user);
-    const session = await createSession(user.id, refreshToken, req);
+    const { accessToken } = generateTokens(user);
+    // const session = await createSession(user.id, accessToken, req);
 
     // Update last login time
     await prisma.user.update({
@@ -691,7 +613,6 @@ const phoneLoginVerify = async (phoneNumber, otp, req) => {
       success: true,
       message: 'Login successful.',
       accessToken,
-      refreshToken,
       user: {
         id: user.id,
         phone: user.phone,
@@ -713,7 +634,6 @@ module.exports = {
   verifyEmail,
   forgotPassword,
   resetPassword,
-  refreshToken,
   changePassword,
   logout,
   resendVerification,

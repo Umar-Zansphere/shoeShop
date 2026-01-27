@@ -2,33 +2,54 @@
 
 @layer base {
   :root {
-    /* Color Scheme */
     --background: #FAFAF8;
+    --card-bg: #FFFFFF;
+    --img-bg: #F3F4F6;
     --accent: #FF6B6B;
     --sidebar: #1E293B;
     --text-primary: #1F2937;
-    --text-secondary: #6B7280;
-    --border: #E5E7EB;
-  }
-
-  * {
-    @apply antialiased;
-  }
-
-  html {
-    @apply scroll-smooth;
+    --text-secondary: #9CA3AF;
+    
+    /* Enhanced theme variables */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    --shadow-accent: 0 8px 16px -2px rgba(255, 107, 107, 0.15);
+    
+    --radius-lg: 1.5rem;
+    --radius-xl: 2rem;
+    --radius-2xl: 2.5rem;
+    
+    --transition-fast: 200ms;
+    --transition-base: 300ms;
+    --transition-slow: 500ms;
   }
 
   body {
-    @apply bg-[#FAFAF8] text-[#1F2937] font-sans;
+    @apply bg-(--background) text-(--text-primary) font-sans transition-colors duration-(--transition-base);
   }
 
-  /* Typography */
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-sans font-bold tracking-tight;
+  * {
+    @apply transition-all duration-(--transition-base);
   }
+}
 
-  button {
-    @apply font-sans transition-colors duration-200;
-  }
+@layer utilities {
+  .text-accent { @apply text-(--accent) transition-colors duration-(--transition-base); }
+  .bg-accent { @apply bg-(--accent) transition-colors duration-(--transition-base); }
+  .text-primary { @apply text-(--text-primary); }
+  .text-secondary { @apply text-(--text-secondary); }
+  
+  /* Shadow utilities */
+  .shadow-accent { @apply shadow-(--shadow-accent); }
+  .shadow-smooth { @apply shadow-(--shadow-md); }
+  
+  /* Rounded utilities */
+  .rounded-lg-custom { @apply rounded-(--radius-lg); }
+  .rounded-xl-custom { @apply rounded-(--radius-xl); }
+  .rounded-2xl-custom { @apply rounded-(--radius-2xl); }
+  
+  /* Focus states */
+  .focus-ring { @apply focus:outline-none focus:ring-2 focus:ring-(--accent) focus:ring-offset-2; }
 }

@@ -25,7 +25,7 @@ const Sidebar = ({ isOpen, onClose, user, onLogout, onAuthRequest }) => {
           <div className="mb-8 p-4 bg-white/5 rounded-2xl border border-white/10">
             {user ? (
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-[#FF6B6B] flex items-center justify-center text-white font-bold text-lg">
+                <div className="w-12 h-12 rounded-full bg-(--accent) flex items-center justify-center text-white font-bold text-lg">
                   {user.name ? user.name[0].toUpperCase() : 'U'}
                 </div>
                 <div>
@@ -38,7 +38,7 @@ const Sidebar = ({ isOpen, onClose, user, onLogout, onAuthRequest }) => {
                 <p className="text-gray-400 mb-4 text-sm">Sign in to sync your wishlist and orders.</p>
                 <button 
                   onClick={() => { onClose(); onAuthRequest(); }}
-                  className="w-full py-3 bg-[#FF6B6B] text-white rounded-xl font-semibold hover:bg-[#ff5252] transition-colors"
+                  className="w-full py-3 bg-(--accent) text-white rounded-xl font-semibold hover:bg-[#FF5252] transition-colors duration-300"
                 >
                   Login / Signup
                 </button>

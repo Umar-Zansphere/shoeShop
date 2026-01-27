@@ -34,31 +34,20 @@ const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const result = await authService.login(email, password, req);
-
+    console.log("Login successful for user:", result.accessToken);
     const user = result.user;
     res.cookie('accessToken', result.accessToken, {
       httpOnly: true, 
       secure: true,
       sameSite: 'none', 
-      maxAge: 15 * 60 * 1000, 
-      path: '/' 
-    });
-
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true, 
-      secure: true,
-      //secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
-      sameSite: 'none', 
-      // sameSite: 'strict', // Helps mitigate CSRF attacks
-      maxAge:  7 * 24 * 60 * 60 * 1000, 
-      path: '/'
+      maxAge: 7 * 24 * 60 * 60 * 1000, 
     });
     
     // Send back user data (excluding sensitive fields) along with the token
     const userData = {
       id: user.id,
       fullName: user.fullName,
-      accessToken: result.accessToken
+      userRole: user.role,
     };
     
     res.json({ user: userData });
@@ -86,24 +75,6 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-const refreshToken =async (req, res, next) => {
-  try {
-    console.log("🚀 Refresh token endpoint hit");
-    const { accessToken } = await authService.refreshToken(req);
-    res.cookie('accessToken', accessToken, {
-      httpOnly: true, 
-      secure: true,
-      sameSite: 'none', 
-      maxAge: 15 * 60 * 1000, 
-      path: '/' 
-    });
-    res.status(200).json({accessToken: accessToken, message: 'Token refreshed successfully.' });
-
-  } catch (error) {
-    console.error("❌ Refresh token controller error:", error.message);
-    next(error);
-  }
-};
 
 const changePassword = async (req, res, next) => {
   try {
@@ -118,23 +89,15 @@ const changePassword = async (req, res, next) => {
 const logout = async (req, res, next) => {
   try {
     // Get the refresh token from the cookie
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies.accessToken;
     console.log("Logging out user:", req.user.id);
-    console.log("With refresh token:", refreshToken);
     await authService.logout(req.user.id, refreshToken);
     res.clearCookie('accessToken', {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: false,
+      sameSite: 'lax',
       path: '/' 
     });
-
-    res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'none',
-    path: '/' 
-});
     res.json({ message: 'Logged out successfully' });
   } catch (error) {
     next(error)
@@ -206,14 +169,6 @@ const phoneSignupVerify = async (req, res, next) => {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
-      maxAge: 15 * 60 * 1000,
-      path: '/'
-    });
-
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/'
     });
@@ -221,7 +176,6 @@ const phoneSignupVerify = async (req, res, next) => {
     res.status(201).json({
       message: result.message,
       user: result.user,
-      accessToken: result.accessToken
     });
   } catch (error) {
     next(error);
@@ -260,14 +214,6 @@ const phoneLoginVerify = async (req, res, next) => {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
-      maxAge: 15 * 60 * 1000,
-      path: '/'
-    });
-
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/'
     });
@@ -276,7 +222,7 @@ const phoneLoginVerify = async (req, res, next) => {
       id: result.user.id,
       phone: result.user.phone,
       fullName: result.user.fullName,
-      accessToken: result.accessToken
+      userRole: result.user.role,
     };
 
     res.json({ user: userData, message: result.message });
@@ -292,7 +238,6 @@ module.exports = {
   login,
   forgotPassword,
   resetPassword,
-  refreshToken,
   changePassword,
   logout,
   sendPhoneVerification,

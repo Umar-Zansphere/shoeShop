@@ -1,54 +1,42 @@
 'use client';
 
-import { Home, ShoppingBag, Package, Wallet, User } from 'lucide-react';
+import { Home, ShoppingBag, Wallet, User, Compass } from 'lucide-react';
 
-const Footer = ({ activeTab = 'home', onTabChange }) => {
+export default function Footer({ activeTab, onTabChange }) {
   const tabs = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'cart', label: 'Cart', icon: ShoppingBag },
-    { id: 'orders', label: 'Orders', icon: Package },
-    { id: 'wallet', label: 'Wallet', icon: Wallet },
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'home', icon: Home, label: 'Home' },
+    { id: 'explore', icon: Compass, label: 'Explore' },
+    { id: 'cart', icon: ShoppingBag, label: 'Cart' },
+    { id: 'wallet', icon: Wallet, label: 'Wallet' },
+    { id: 'profile', icon: User, label: 'Account' },
   ];
 
   return (
-    <footer className="fixed pb-6 bottom-0 left-0 right-0  z-20">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-around h-20">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            
-            return (
-              <button
-                key={tab.id}
-                onClick={() => onTabChange?.(tab.id)}
-                className="flex flex-col items-center justify-center gap-1 px-4 py-2 transition-colors group"
-              >
-                <Icon
-                  size={28}
-                  className={`transition-colors ${
-                    isActive
-                      ? 'text-gray-900 fill-gray-900'
-                      : 'text-gray-400 group-hover:text-gray-600'
-                  }`}
-                />
-                <span
-                  className={`text-xs font-medium transition-colors ${
-                    isActive
-                      ? 'text-gray-900'
-                      : 'text-gray-500 group-hover:text-gray-700'
-                  }`}
-                >
-                  {tab.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+    <div className="fixed bottom-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+      <div className="pointer-events-auto bg-(--card-bg)/90 backdrop-blur-xl border border-gray-200/50 shadow-lg shadow-black/8 rounded-full px-6 py-4 flex items-center gap-6 sm:gap-10 transition-all duration-300">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              className="relative group flex items-center justify-center transition-all duration-300"
+            >
+              <div className={`absolute -inset-3 rounded-full transition-all duration-300 ${isActive ? 'bg-(--text-primary)' : 'group-hover:bg-(--img-bg)'}`} />
+              
+              <Icon
+                size={24}
+                strokeWidth={isActive ? 2.5 : 2}
+                className={`relative z-10 transition-colors duration-300 ${
+                  isActive ? 'text-white' : 'text-gray-400 group-hover:text-(--text-secondary)'
+                }`}
+              />
+            </button>
+          );
+        })}
       </div>
-    </footer>
+    </div>
   );
-};
-
-export default Footer;
+}

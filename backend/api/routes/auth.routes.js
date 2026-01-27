@@ -23,7 +23,6 @@ const otpLimiter = rateLimit({
 // Email/Password based auth
 router.post('/signup',  authController.signup);
 router.post('/login', loginLimiter, authController.login);
-router.post('/refresh-token', authController.refreshToken);
 router.get('/verify-email', authController.verifyEmail);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
