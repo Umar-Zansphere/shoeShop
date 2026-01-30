@@ -1,235 +1,274 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Plus, Search, Edit2, Trash2, Eye } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import AdminTable from '@/components/admin/AdminTable';
+import Button from '@/components/admin/Button';
+import FormInput from '@/components/admin/FormInput';
+import FormSelect from '@/components/admin/FormSelect';
+import Alert from '@/components/admin/Alert';
 import { productsApi } from '@/lib/adminApi';
-import Link from 'next/link';
-import { Plus, Trash2, Edit, Eye } from 'lucide-react';
 
 export default function ProductsPage() {
+  const router = useRouter();
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [pagination, setPagination] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [alert, setAlert] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
-    search: '',
     category: '',
     gender: '',
+    isActive: '',
+  });
+  const [pagination, setPagination] = useState({
     skip: 0,
     take: 10,
+    total: 0,
   });
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     fetchProducts();
-  }, [filters]);
+  }, [filters, pagination.skip]);
 
   const fetchProducts = async () => {
     try {
-      setLoading(true);
-      const data = await productsApi.getProducts(filters);
-      setProducts(data.products);
-      setPagination(data.pagination);
-      setError('');
-    } catch (err) {
-      setError('Failed to load products');
-      console.error(err);
+      setIsLoading(true);
+      const response = await productsApi.getProducts({
+        ...filters,
+        search: searchTerm || undefined,
+        skip: pagination.skip,
+        take: pagination.take,
+      });
+      console.log("Products response:", response);
+      setProducts(response.products || []);
+      setPagination((prev) => ({
+        ...prev,
+        total: response.pagination?.total || 0,
+      }));
+    } catch (error) {
+      setAlert({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load products',
+      });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleDelete = async (productId) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+
     try {
       await productsApi.deleteProduct(productId);
-      setProducts(products.filter(p => p.id !== productId));
-      setDeleteConfirm(null);
-    } catch (err) {
-      setError('Failed to delete product');
+      setAlert({
+        type: 'success',
+        title: 'Success',
+        message: 'Product deleted successfully',
+      });
+      fetchProducts();
+    } catch (error) {
+      setAlert({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to delete product',
+      });
     }
   };
 
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value, skip: 0 }));
+  const handleSearch = (value) => {
+    setSearchTerm(value);
+    setPagination((prev) => ({ ...prev, skip: 0 }));
   };
+
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+    setPagination((prev) => ({ ...prev, skip: 0 }));
+  };
+
+  const columns = [
+    {
+      key: 'id',
+      label: 'ID',
+      render: (value) => <span className="font-mono text-xs text-gray-500">{value.slice(0, 8)}</span>,
+    },
+    {
+      key: 'name',
+      label: 'Product Name',
+      sortable: true,
+    },
+    {
+      key: 'category',
+      label: 'Category',
+      render: (value) => <span className="text-gray-600">{value}</span>,
+    },
+    {
+      key: 'gender',
+      label: 'Gender',
+      render: (value) => <span className="capitalize">{value}</span>,
+    },
+    {
+      key: 'price',
+      label: 'Price',
+      render: (value) => <span className="font-semibold text-gray-900">₹{value}</span>,
+    },
+    {
+      key: 'isActive',
+      label: 'Status',
+      render: (value) => (
+        <span
+          className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+            value ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          {value ? 'Active' : 'Inactive'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_, row) => (
+        <div className="flex gap-2">
+          <button
+            onClick={() => router.push(`/admin/products/${row.id}`)}
+            className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors"
+            title="Edit"
+          >
+            <Edit2 size={16} />
+          </button>
+          <button
+            onClick={() => handleDelete(row.id)}
+            className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const currentPage = Math.floor(pagination.skip / pagination.take) + 1;
+  const totalPages = Math.ceil(pagination.total / pagination.take);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-(--text-primary)">Products</h1>
-        <Link
-          href="/admin/products/new"
-          className="flex items-center gap-2 px-6 py-3 bg-(--accent) text-white rounded-lg font-semibold hover:bg-[#FF5252] transition-colors"
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Products</h1>
+          <p className="text-gray-600 mt-1">Manage your product catalog</p>
+        </div>
+        <Button
+          onClick={() => router.push('/admin/products/new')}
+          className="gap-2"
         >
           <Plus size={20} />
           Add Product
-        </Link>
+        </Button>
       </div>
+
+      {/* Alerts */}
+      {alert && (
+        <Alert
+          type={alert.type}
+          title={alert.title}
+          message={alert.message}
+          onClose={() => setAlert(null)}
+        />
+      )}
 
       {/* Filters */}
-      <div className="bg-(--card-bg) border border-gray-200 rounded-2xl p-6 space-y-4">
+      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+        <h3 className="font-semibold text-gray-900">Filters</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-(--text-primary) mb-2">Search</label>
-            <input
-              type="text"
-              name="search"
-              value={filters.search}
-              onChange={handleFilterChange}
-              placeholder="Search by name or brand..."
-              className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-(--accent) focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-(--text-primary) mb-2">Category</label>
-            <select
-              name="category"
-              value={filters.category}
-              onChange={handleFilterChange}
-              className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-(--accent) focus:outline-none"
-            >
-              <option value="">All Categories</option>
-              <option value="RUNNING">Running</option>
-              <option value="CASUAL">Casual</option>
-              <option value="SPORTS">Sports</option>
-              <option value="FORMAL">Formal</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-(--text-primary) mb-2">Gender</label>
-            <select
-              name="gender"
-              value={filters.gender}
-              onChange={handleFilterChange}
-              className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-(--accent) focus:outline-none"
-            >
-              <option value="">All Genders</option>
-              <option value="MEN">Men</option>
-              <option value="WOMEN">Women</option>
-              <option value="KIDS">Kids</option>
-              <option value="UNISEX">Unisex</option>
-            </select>
-          </div>
+          <FormInput
+            placeholder="Search products..."
+            value={searchTerm}
+            onChange={(e) => handleSearch(e.target.value)}
+            icon={<Search size={18} />}
+          />
+          <FormSelect
+            placeholder="All Categories"
+            value={filters.category}
+            onChange={(e) => handleFilterChange('category', e.target.value)}
+            options={[
+              { label: 'Running', value: 'RUNNING' },
+              { label: 'Casual', value: 'CASUAL' },
+              { label: 'Formal', value: 'FORMAL' },
+              { label: 'Sneakers', value: 'SNEAKERS' },
+            ]}
+          />
+          <FormSelect
+            placeholder="All Genders"
+            value={filters.gender}
+            onChange={(e) => handleFilterChange('gender', e.target.value)}
+            options={[
+              { label: 'Men', value: 'MEN' },
+              { label: 'Women', value: 'WOMEN' },
+              { label: 'Unisex', value: 'UNISEX' },
+              { label: 'Kids', value: 'KIDS' },
+            ]}
+          />
+          <FormSelect
+            placeholder="All Status"
+            value={filters.isActive}
+            onChange={(e) => handleFilterChange('isActive', e.target.value)}
+            options={[
+              { label: 'Active', value: 'true' },
+              { label: 'Inactive', value: 'false' },
+            ]}
+          />
         </div>
       </div>
 
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-(--accent) rounded-2xl">
-          {error}
-        </div>
-      )}
-
       {/* Products Table */}
-      {!loading && (
-        <div className="bg-(--card-bg) border border-gray-200 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-(--text-primary)">Product</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-(--text-primary)">Brand</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-(--text-primary)">Category</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-(--text-primary)">Gender</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-(--text-primary)">Variants</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-(--text-primary)">Status</th>
-                  <th className="text-left py-4 px-6 text-sm font-semibold text-(--text-primary)">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((product) => (
-                  <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="py-4 px-6 text-(--text-primary) font-medium">{product.name}</td>
-                    <td className="py-4 px-6 text-(--text-secondary)">{product.brand}</td>
-                    <td className="py-4 px-6 text-(--text-secondary)">{product.category}</td>
-                    <td className="py-4 px-6 text-(--text-secondary)">{product.gender}</td>
-                    <td className="py-4 px-6">
-                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                        {product.variants?.length || 0}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        product.isActive
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {product.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 flex items-center gap-2">
-                      <Link
-                        href={`/admin/products/${product.id}`}
-                        className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
-                      >
-                        <Edit size={18} />
-                      </Link>
-                      <button
-                        onClick={() => setDeleteConfirm(product.id)}
-                        className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <AdminTable
+        columns={columns}
+        data={products}
+        isLoading={isLoading}
+        emptyMessage="No products found"
+      />
 
-          {/* Pagination */}
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-(--text-secondary)">
-              Showing {filters.skip + 1} to {Math.min(filters.skip + filters.take, pagination.total)} of {pagination.total}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFilters(prev => ({ ...prev, skip: Math.max(0, prev.skip - prev.take) }))}
-                disabled={filters.skip === 0}
-                className="px-4 py-2 border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition-colors"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => setFilters(prev => ({ ...prev, skip: prev.skip + prev.take }))}
-                disabled={filters.skip + filters.take >= pagination.total}
-                className="px-4 py-2 border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-8 h-8 border-3 border-(--accent) border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4">
-            <h3 className="text-lg font-bold text-(--text-primary)">Delete Product?</h3>
-            <p className="text-(--text-secondary)">
-              Are you sure you want to delete this product? This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
-              >
-                Delete
-              </button>
-            </div>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-600">
+            Showing {pagination.skip + 1} to {Math.min(pagination.skip + pagination.take, pagination.total)} of{' '}
+            {pagination.total} products
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.skip === 0}
+              onClick={() =>
+                setPagination((prev) => ({
+                  ...prev,
+                  skip: Math.max(0, prev.skip - prev.take),
+                }))
+              }
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= totalPages}
+              onClick={() =>
+                setPagination((prev) => ({
+                  ...prev,
+                  skip: prev.skip + prev.take,
+                }))
+              }
+            >
+              Next
+            </Button>
           </div>
         </div>
       )}

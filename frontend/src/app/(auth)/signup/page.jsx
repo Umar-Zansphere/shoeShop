@@ -5,8 +5,9 @@ import { Smartphone, Mail, Lock, ArrowRight, User } from 'lucide-react';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { authApi } from '@/lib/api';
+import PublicRoute from '@/components/PublicRoute';
 
-export default function SignupPage() {
+function SignupContent() {
   const router = useRouter();
   const [method, setMethod] = useState('phone');
   const [loading, setLoading] = useState(false);
@@ -145,6 +146,14 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <PublicRoute>
+      <SignupContent />
+    </PublicRoute>
   );
 }
 

@@ -5,13 +5,17 @@ const authRoutes = require('./auth.routes');
 const userRoutes = require('./user.routes');
 const cartRoutes = require('./cart.routes');
 const wishlistRoutes = require('./wishlist.routes');
+const productRoutes = require('./product.routes');
+const orderRoutes = require('./order.routes');
 const adminRoutes = require('./admin.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
+router.use('/products', productRoutes);
 router.use('/cart', cartRoutes);
 router.use('/wishlist', wishlistRoutes);
+router.use('/orders', orderRoutes);
 router.use('/admin', adminRoutes);
 
 module.exports = router;

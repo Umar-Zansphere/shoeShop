@@ -1,99 +1,106 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, Heart, Star, ShoppingCart, ChevronLeft, ChevronRight, Truck, RotateCcw, Shield, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Heart, Star, ShoppingCart, ChevronLeft, ChevronRight, Truck, RotateCcw, Shield, Check, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { productApi, cartApi, wishlistApi, storageApi } from '@/lib/api';
 import RelatedProducts from '@/app/components/RelatedProducts';
 
-// Mock Data for this specific view
-const PRODUCT = {
-  id: 1,
-  name: 'Air Jordan 1 Retro High OG',
-  category: 'Shoes',
-  price: 10499,
-  rating: 4.5,
-  reviewCount: '11,524',
-  description: "Familiar but always fresh, the iconic Air Jordan 1 is remastered for today's sneakerhead culture. This Retro High OG version goes all in with full-grain leather, comfortable cushioning and classic design details.",
-  colors: [
-    { 
-      id: 'c1', 
-      name: 'Black/White', 
-      images: [
-        'https://images.unsplash.com/photo-1556906781-9a412961c28c?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1512374382149-233c42b6a83b?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1460353581641-37baddab0fa2?auto=format&fit=crop&q=80&w=800',
-      ]
-    },
-    { 
-      id: 'c2', 
-      name: 'Yellow/Black', 
-      images: [
-        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1556906781-9a412961c28c?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1512374382149-233c42b6a83b?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1468452073230-91cabc968266?auto=format&fit=crop&q=80&w=800',
-      ]
-    },
-    { 
-      id: 'c3', 
-      name: 'Gold/Black', 
-      images: [
-        'https://images.unsplash.com/photo-1512374382149-233c42b6a83b?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1556906781-9a412961c28c?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=800',
-        'https://images.unsplash.com/photo-1460353581641-37baddab0fa2?auto=format&fit=crop&q=80&w=800',
-      ]
-    },
-  ],
-  sizes: [
-    { val: 40, enabled: true },
-    { val: 41, enabled: true },
-    { val: 42, enabled: true },
-    { val: 43, enabled: true },
-    { val: 44, enabled: false },
-    { val: 45, enabled: true },
-    { val: 46, enabled: true },
-  ],
-  relatedProducts: [
-    {
-      id: 101,
-      name: 'Air Jordan 2 OG 88 True Blue',
-      brand: 'Jordan',
-      price: 250,
-      image: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?auto=format&fit=crop&q=80&w=400',
-    },
-    {
-      id: 102,
-      name: 'Adidas NMD Classic',
-      brand: 'Adidas',
-      price: 150,
-      image: 'https://images.unsplash.com/photo-1587563871167-1ee9c731aef4?auto=format&fit=crop&q=80&w=400',
-    },
-    {
-      id: 103,
-      name: 'Puma RS-X Runner',
-      brand: 'Puma',
-      price: 120,
-      image: 'https://images.unsplash.com/photo-1511107696-a4b0c5a0d9a2?auto=format&fit=crop&q=80&w=400',
-    },
-  ],
-};
-
 export default function ProductDetailsPage() {
-  const [selectedSize, setSelectedSize] = useState(41);
-  const [selectedColor, setSelectedColor] = useState('c1');
+  const params = useParams();
+  const productId = params.id;
+
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedSize, setSelectedSize] = useState(null);
+  const [selectedColor, setSelectedColor] = useState(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [region, setRegion] = useState('EU');
   const [isLiked, setIsLiked] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [cartMessage, setCartMessage] = useState(null);
+  const [wishlistMessage, setWishlistMessage] = useState(null);
 
-  const currentColor = PRODUCT.colors.find(c => c.id === selectedColor);
-  const currentImages = currentColor?.images || [];
-  const currentImage = currentImages[selectedImageIndex];
+  // Fetch product details
+  useEffect(() => {
+    const loadProduct = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await productApi.getProductDetail(productId);
+        const productData = data.data || data;
+        setProduct(productData);
+        
+        // Set initial color and size
+        if (productData.variants && productData.variants.length > 0) {
+          setSelectedColor(productData.variants[0].color);
+          setSelectedSize(productData.variants[0].size);
+        }
+      } catch (err) {
+        console.error('Failed to load product:', err);
+        setError('Failed to load product. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleColorChange = (colorId) => {
-    setSelectedColor(colorId);
+    if (productId) {
+      loadProduct();
+    }
+  }, [productId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#FF6B6B]"></div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="min-h-screen bg-white">
+        <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
+            <Link 
+              href="/" 
+              className="flex items-center gap-2 text-gray-700 hover:text-gray-900 font-medium transition-colors"
+            >
+              <ArrowLeft size={20} />
+              <span className="hidden sm:inline">Back</span>
+            </Link>
+            <h1 className="text-sm sm:text-base font-semibold text-[#1E293B] flex-1 text-center px-4">
+              Product Not Found
+            </h1>
+          </div>
+        </header>
+        <main className="max-w-7xl mx-auto px-4 py-12 text-center">
+          <p className="text-gray-600 mb-6">{error || 'This product could not be found.'}</p>
+          <Link href="/products" className="inline-block px-6 py-3 bg-[#FF6B6B] text-white rounded-lg hover:bg-[#FF5252]">
+            Continue Shopping
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
+  const currentVariants = product.variants?.filter(v => v.color === selectedColor) || [];
+  const currentVariant = currentVariants.find(v => v.size === selectedSize) || currentVariants[0];
+  const currentImages = currentVariant?.images || [];
+  const currentImage = currentImages[selectedImageIndex]?.url || currentImages[0]?.url;
+  
+  const uniqueColors = [...new Set(product.variants.map(v => v.color))];
+  const uniqueSizes = [...new Set(product.variants.map(v => v.size))];
+
+  const handleColorChange = (color) => {
+    setSelectedColor(color);
     setSelectedImageIndex(0);
+    const variantsWithColor = product.variants.filter(v => v.color === color);
+    if (variantsWithColor.length > 0) {
+      setSelectedSize(variantsWithColor[0].size);
+    }
   };
 
   const nextImage = () => {
@@ -104,6 +111,108 @@ export default function ProductDetailsPage() {
     setSelectedImageIndex((prev) => 
       prev === 0 ? currentImages.length - 1 : prev - 1
     );
+  };
+
+  const ratingValue = 4.5; // Mock rating for now
+  const reviewCount = '1,234'; // Mock review count
+
+  const handleAddToCart = async () => {
+    if (!currentVariant) {
+      setCartMessage({ type: 'error', text: 'Please select a size' });
+      return;
+    }
+
+    setIsAddingToCart(true);
+    setCartMessage(null);
+
+    try {
+      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+
+      if (isLoggedIn) {
+        // API call for logged-in users
+        console.log('Adding to cart via API:', { variantId: currentVariant.id, quantity: 1 });
+        await cartApi.addToCart(currentVariant.id, 1);
+      } else {
+        // localStorage for non-logged-in users
+        const cartItem = {
+          id: `cart-${currentVariant.id}`,
+          productId: product.id,
+          variantId: currentVariant.id,
+          quantity: 1,
+          unitPrice: currentVariant.price,
+          product: {
+            id: product.id,
+            name: product.name,
+            brand: product.brand,
+            category: product.category,
+            gender: product.gender
+          },
+          variant: currentVariant
+        };
+        console.log('Adding to localStorage cart:', cartItem);
+        storageApi.addToCart(cartItem);
+      }
+
+      setCartMessage({ type: 'success', text: 'Added to cart!' });
+      setTimeout(() => setCartMessage(null), 3000);
+    } catch (err) {
+      console.error('Error adding to cart:', err);
+      setCartMessage({ type: 'error', text: err.message || 'Failed to add to cart' });
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
+
+  const handleToggleWishlist = async () => {
+    if (!currentVariant) {
+      setWishlistMessage({ type: 'error', text: 'Please select a variant' });
+      return;
+    }
+
+    setWishlistMessage(null);
+
+    try {
+      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+
+      if (isLoggedIn) {
+        // API call for logged-in users
+        if (isLiked) {
+          console.log('Removing from wishlist via API');
+          // Note: We'd need the wishlist item ID to remove - for now just update state
+        } else {
+          console.log('Adding to wishlist via API:', { productId, variantId: currentVariant.id });
+          await wishlistApi.addToWishlist(product.id, currentVariant.id);
+        }
+      } else {
+        // localStorage for non-logged-in users
+        const wishlistItem = {
+          id: `wishlist-${currentVariant.id}`,
+          productId: product.id,
+          variantId: currentVariant.id,
+        };
+
+        const currentWishlist = storageApi.getWishlist();
+        const exists = currentWishlist.some(w => w.productId === product.id);
+
+        if (exists) {
+          console.log('Removing from localStorage wishlist');
+          storageApi.removeFromWishlist(`wishlist-${currentVariant.id}`);
+        } else {
+          console.log('Adding to localStorage wishlist:', wishlistItem);
+          storageApi.addToWishlist(wishlistItem);
+        }
+      }
+
+      setIsLiked(!isLiked);
+      setWishlistMessage({ 
+        type: 'success', 
+        text: isLiked ? 'Removed from wishlist' : 'Added to wishlist!' 
+      });
+      setTimeout(() => setWishlistMessage(null), 3000);
+    } catch (err) {
+      console.error('Error toggling wishlist:', err);
+      setWishlistMessage({ type: 'error', text: err.message || 'Failed to update wishlist' });
+    }
   };
 
   return (
@@ -118,8 +227,8 @@ export default function ProductDetailsPage() {
             <ArrowLeft size={20} />
             <span className="hidden sm:inline">Back</span>
           </Link>
-          <h1 className="text-sm sm:text-base font-semibold text-[#1E293B] text-center flex-1 px-4">
-            {PRODUCT.name}
+          <h1 className="text-sm sm:text-base font-semibold text-[#1E293B] text-center flex-1 px-4 truncate">
+            {product.name}
           </h1>
           <button 
             onClick={() => setIsLiked(!isLiked)}
@@ -134,6 +243,33 @@ export default function ProductDetailsPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 pb-32 sm:pb-8">
+        {/* Feedback Messages */}
+        {cartMessage && (
+          <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
+            cartMessage.type === 'success' 
+              ? 'bg-green-50 border border-green-200' 
+              : 'bg-red-50 border border-red-200'
+          }`}>
+            <AlertCircle size={20} className={cartMessage.type === 'success' ? 'text-green-600' : 'text-red-600'} />
+            <p className={cartMessage.type === 'success' ? 'text-green-700' : 'text-red-700'}>
+              {cartMessage.text}
+            </p>
+          </div>
+        )}
+
+        {wishlistMessage && (
+          <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
+            wishlistMessage.type === 'success' 
+              ? 'bg-green-50 border border-green-200' 
+              : 'bg-red-50 border border-red-200'
+          }`}>
+            <AlertCircle size={20} className={wishlistMessage.type === 'success' ? 'text-green-600' : 'text-red-600'} />
+            <p className={wishlistMessage.type === 'success' ? 'text-green-700' : 'text-red-700'}>
+              {wishlistMessage.text}
+            </p>
+          </div>
+        )}
+
         {/* Layout: Image on left, Details on right */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mb-12">
           
@@ -141,11 +277,15 @@ export default function ProductDetailsPage() {
           <div className="flex flex-col gap-4">
             {/* Main Image */}
             <div className="relative w-full aspect-square bg-linear-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden flex items-center justify-center group">
-              <img 
-                src={currentImage} 
-                alt={`${PRODUCT.name} - ${currentColor?.name}`}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
+              {currentImage ? (
+                <img 
+                  src={currentImage} 
+                  alt={`${product.name} - ${selectedColor}`}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              ) : (
+                <div className="text-gray-400">No image available</div>
+              )}
               
               {/* Navigation Arrows */}
               {currentImages.length > 1 && (
@@ -184,7 +324,7 @@ export default function ProductDetailsPage() {
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                    <img src={img.url} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -196,10 +336,10 @@ export default function ProductDetailsPage() {
             {/* Header Info */}
             <div className="mb-6 pb-6 border-b border-gray-200">
               <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="text-sm text-gray-500 font-medium mb-1">{PRODUCT.category}</p>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-500 font-medium mb-1">{product.category}</p>
                   <h2 className="text-2xl sm:text-3xl font-bold text-[#1E293B]">
-                    {PRODUCT.name}
+                    {product.name}
                   </h2>
                 </div>
               </div>
@@ -212,14 +352,14 @@ export default function ProductDetailsPage() {
                       <Star
                         key={i}
                         size={18}
-                        className={i < Math.floor(PRODUCT.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                        className={i < Math.floor(ratingValue) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
                       />
                     ))}
                   </div>
-                  <span className="font-bold text-gray-900">{PRODUCT.rating}</span>
+                  <span className="font-bold text-gray-900">{ratingValue}</span>
                 </div>
                 <span className="text-sm text-gray-500">
-                  {PRODUCT.reviewCount} reviews
+                  {reviewCount} reviews
                 </span>
               </div>
 
@@ -227,93 +367,94 @@ export default function ProductDetailsPage() {
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <p className="text-xs text-gray-500 font-medium mb-1">Price</p>
                 <p className="text-3xl font-black text-[#FF6B6B]">
-                  ₹{PRODUCT.price.toLocaleString()}
+                  ₹{currentVariant?.price ? parseFloat(currentVariant.price).toLocaleString() : 'N/A'}
                 </p>
+                {currentVariant?.compareAtPrice && (
+                  <p className="text-sm text-gray-500 line-through mt-1">
+                    ₹{parseFloat(currentVariant.compareAtPrice).toLocaleString()}
+                  </p>
+                )}
               </div>
             </div>
 
             {/* Description */}
-            <div className="mb-6">
-              <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
-                {PRODUCT.description}
-              </p>
-            </div>
+            {product.description && (
+              <div className="mb-6">
+                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
+                  {product.description}
+                </p>
+              </div>
+            )}
 
             {/* Color Selection */}
-            <div className="mb-8">
-              <h3 className="text-sm font-bold text-[#1E293B] uppercase tracking-wide mb-4">
-                Color Variant
-              </h3>
-              <div className="flex gap-3 flex-wrap">
-                {PRODUCT.colors.map((color) => (
-                  <button
-                    key={color.id}
-                    onClick={() => handleColorChange(color.id)}
-                    className={`relative group transition-all`}
-                  >
-                    <div className={`w-16 h-16 rounded-xl border-2 overflow-hidden transition-all flex items-center justify-center ${
-                      selectedColor === color.id 
-                        ? 'border-[#FF6B6B] shadow-lg scale-105' 
-                        : 'border-gray-300 hover:border-gray-400 hover:shadow-md'
-                    }`}>
-                      <img src={color.images[0]} alt={color.name} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                      {color.name}
-                    </div>
-                    {/* {color.images.length > 1 && (
-                      <div className="absolute -top-2 -right-2 bg-[#FF6B6B] text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                        {color.images.length}
+            {uniqueColors.length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-sm font-bold text-[#1E293B] uppercase tracking-wide mb-4">
+                  Color Variant
+                </h3>
+                <div className="flex gap-3 flex-wrap">
+                  {uniqueColors.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => handleColorChange(color)}
+                      className={`relative group transition-all`}
+                    >
+                      <div className={`w-16 h-16 rounded-xl border-2 overflow-hidden transition-all flex items-center justify-center ${
+                        selectedColor === color 
+                          ? 'border-[#FF6B6B] shadow-lg scale-105' 
+                          : 'border-gray-300 hover:border-gray-400 hover:shadow-md'
+                      }`}>
+                        <img src={product.variants.find(v => v.color === color)?.images?.[0]?.url || ''} alt={color} className="w-full h-full object-cover" />
                       </div>
-                    )} */}
-                  </button>
-                ))}
+                      <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                        {color}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Size Selection */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-[#1E293B] uppercase tracking-wide">
-                  Select Size ({region})
-                </h3>
+            {uniqueSizes.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-[#1E293B] uppercase tracking-wide">
+                    Select Size ({region})
+                  </h3>
+                </div>
                 
-              </div>
-              
-              <div className="flex flex-wrap gap-2">
-                {PRODUCT.sizes.map((size) => (
-                  <button
-                    key={size.val}
-                    disabled={!size.enabled}
-                    onClick={() => setSelectedSize(size.val)}
-                    className={`flex-1 min-w-12.5 py-3 rounded-lg font-semibold text-sm transition-all duration-200 relative group ${
-                      !size.enabled 
-                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed' 
-                        : selectedSize === size.val
+                <div className="flex flex-wrap gap-2">
+                  {uniqueSizes.map((size) => (
+                    <button
+                      key={size}
+                      onClick={() => setSelectedSize(size)}
+                      className={`flex-1 min-w-12.5 py-3 rounded-lg font-semibold text-sm transition-all duration-200 ${
+                        selectedSize === size
                           ? 'bg-[#FF6B6B] text-white shadow-lg shadow-[#FF6B6B]/30'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900'
-                    }`}
-                  >
-                    {size.val}
-                    {!size.enabled && (
-                      <div className="absolute top-full mt-1 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                        Out of Stock
-                      </div>
-                    )}
-                  </button>
-                ))}
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Add to Cart Button */}
-            <button className="w-full bg-linear-to-r from-[#FF6B6B] to-[#FF5252] text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-[#FF6B6B]/30 hover:shadow-2xl hover:shadow-[#FF6B6B]/40 hover:-translate-y-0.5 active:translate-y-1 transition-all flex items-center justify-center gap-2 group mb-4">
-              <ShoppingCart size={22} strokeWidth={2.5} className="group-hover:animate-bounce" />
-              Add to Cart
+            <button 
+              onClick={handleAddToCart}
+              disabled={isAddingToCart}
+              className="w-full bg-linear-to-r from-[#FF6B6B] to-[#FF5252] text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-[#FF6B6B]/30 hover:shadow-2xl hover:shadow-[#FF6B6B]/40 hover:-translate-y-0.5 active:translate-y-1 transition-all flex items-center justify-center gap-2 group mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ShoppingCart size={22} strokeWidth={2.5} className={isAddingToCart ? '' : 'group-hover:animate-bounce'} />
+              {isAddingToCart ? 'Adding to Cart...' : 'Add to Cart'}
             </button>
 
             {/* Wishlist Button */}
             <button 
-              onClick={() => setIsLiked(!isLiked)}
+              onClick={handleToggleWishlist}
               className={`w-full py-3 rounded-xl font-semibold text-sm transition-all border-2 ${
                 isLiked 
                   ? 'bg-[#FF6B6B]/10 border-[#FF6B6B] text-[#FF6B6B]' 
@@ -361,10 +502,12 @@ export default function ProductDetailsPage() {
         </div>
 
         {/* Related Products */}
-        <div>
-          <h2 className="text-2xl font-bold text-[#1E293B] mb-8">You Might Also Like</h2>
-          <RelatedProducts products={PRODUCT.relatedProducts} />
-        </div>
+        {product.variants && product.variants.length > 0 && (
+          <div>
+            <h2 className="text-2xl font-bold text-[#1E293B] mb-8">You Might Also Like</h2>
+            <RelatedProducts products={[]} />
+          </div>
+        )}
       </main>
     </div>
   );

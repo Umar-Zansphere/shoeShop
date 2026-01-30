@@ -30,7 +30,12 @@
 
   const uploadInMemory = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 1024 * 1024 * 5 }, // 5MB limit
+  limits: { 
+    fileSize: 1024 * 1024 * 5, // 5MB limit
+    fieldSize: 1024 * 1024 * 5, // 5MB field size
+    fields: 100, // Max number of non-file fields
+    files: 10 // Max number of file fields
+  },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
     if (!allowedTypes.includes(file.mimetype)) {

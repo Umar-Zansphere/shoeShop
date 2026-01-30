@@ -1,4 +1,5 @@
 const prisma = require('../../config/prisma');
+const razorpayService = require('./razorpay.services');
 
 // ======================== ORDER CRUD ========================
 
@@ -60,13 +61,14 @@ const getOrderById = async (orderId) => {
     where: { id: orderId },
     include: {
       user: { select: { id: true, email: true, fullName: true, phone: true } },
-      items: { 
+      items: {  
         include: { 
           variant: { include: { product: true } }
         }
       },
       payments: true,
       shipments: true,
+      orderAddress: true,
     }
   });
 
@@ -328,20 +330,354 @@ const getOrderItems = async (orderId) => {
   return items;
 };
 
+// ======================== CUSTOMER-FACING ORDER ENDPOINTS ========================
+
+const createOrderFromCart = async (userId, orderData) => {
+  const { addressId, paymentMethod, couponCode } = orderData;
+
+  // Validate required fields
+  if (!addressId || !paymentMethod) {
+    throw new Error('Address ID and payment method are required');
+  }
+
+  // Get user's active cart
+  const cart = await prisma.cart.findFirst({
+    where: { userId, status: 'ACTIVE' },
+    include: { items: { include: { variant: { include: { product: true } } } } }
+  });
+
+  if (!cart || cart.items.length === 0) {
+    throw new Error('Cart is empty');
+  }
+
+  // Get address
+  const address = await prisma.address.findUnique({ where: { id: addressId } });
+  if (!address || address.userId !== userId) {
+    throw new Error('Address not found or unauthorized');
+  }
+
+  // Get user details
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  // Calculate total
+  const totalAmount = cart.items.reduce((sum, item) => sum + (parseFloat(item.unitPrice) * item.quantity), 0);
+
+  // Generate order number
+  const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+  // Create order with transaction
+  const order = await prisma.$transaction(async (tx) => {
+    // Create order
+    const newOrder = await tx.order.create({
+      data: {
+        userId,
+        orderNumber,
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        paymentMethod,
+        totalAmount: parseFloat(totalAmount),
+        items: {
+          create: cart.items.map(item => ({
+            variantId: item.variantId,
+            productName: item.variant.product.name,
+            color: item.variant.color,
+            size: item.variant.size,
+            price: item.unitPrice,
+            quantity: item.quantity,
+            subtotal: parseFloat(item.unitPrice) * item.quantity
+          }))
+        }
+      },
+      include: {
+        items: { include: { variant: { include: { product: true } } } },
+        payments: true,
+        shipments: true
+      }
+    });
+
+    // Create order address
+    await tx.orderAddress.create({
+      data: {
+        orderId: newOrder.id,
+        name: address.name,
+        phone: address.phone,
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2,
+        city: address.city,
+        state: address.state,
+        postalCode: address.postalCode,
+        country: address.country
+      }
+    });
+
+    // Create initial shipment
+    await tx.orderShipment.create({
+      data: {
+        orderId: newOrder.id,
+        status: 'PENDING'
+      }
+    });
+
+    // Mark inventory as HOLD
+    for (const item of cart.items) {
+      await tx.inventoryLog.create({
+        data: {
+          variantId: item.variantId,
+          orderId: newOrder.id,
+          type: 'HOLD',
+          quantity: item.quantity,
+          note: 'Order created, awaiting payment'
+        }
+      });
+    }
+
+    // Update cart status
+    // await tx.cart.update({
+    //   where: { id: cart.id },
+    //   data: { status: 'ORDERED' }
+    // });
+
+    return newOrder;
+  });
+
+  // If Razorpay, create Razorpay order
+  let razorpayOrderDetails = null;
+  if (paymentMethod === 'RAZORPAY') {
+    try {
+      razorpayOrderDetails = await razorpayService.createRazorpayOrder({
+        orderId: order.id,
+        amount: totalAmount,
+        customerEmail: user.email,
+        customerPhone: user.phone,
+        customerName: user.fullName,
+      });
+
+      // Update order with Razorpay order ID
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { razorpayOrderId: razorpayOrderDetails.razorpayOrderId }
+      });
+    } catch (error) {
+      console.error('Error creating Razorpay order:', error);
+      throw new Error(`Failed to initialize payment: ${error.message}`);
+    }
+  }
+
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    totalAmount: order.totalAmount,
+    status: order.status,
+    paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod,
+    items: order.items,
+    // Return Razorpay details if applicable
+    ...(razorpayOrderDetails && {
+      razorpayOrderId: razorpayOrderDetails.razorpayOrderId,
+      razorpayAmount: razorpayOrderDetails.amount,
+      razorpayCurrency: razorpayOrderDetails.currency,
+    })
+  };
+};
+
+const getCustomerOrders = async (userId, filters = {}) => {
+  const { status, skip = 0, take = 10 } = filters;
+
+  const where = { userId };
+  if (status) where.status = status;
+
+  const [orders, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      include: {
+        items: { include: { variant: { include: { product: true } } } },
+        shipments: true,
+        payments: true
+      },
+      skip: parseInt(skip),
+      take: parseInt(take),
+      orderBy: { createdAt: 'desc' }
+    }),
+    prisma.order.count({ where })
+  ]);
+
+  return {
+    orders: orders.map(order => ({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      totalAmount: order.totalAmount,
+      itemCount: order.items.length,
+      createdAt: order.createdAt,
+      shipmentStatus: order.shipments[0]?.status || 'PENDING'
+    })),
+    pagination: {
+      total,
+      skip: parseInt(skip),
+      take: parseInt(take),
+      pages: Math.ceil(total / take)
+    }
+  };
+};
+
+const getCustomerOrderDetail = async (userId, orderId) => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      items: { include: { variant: { include: { product: true } } } },
+      shipments: true,
+      payments: true
+    }
+  });
+
+  if (!order || order.userId !== userId) {
+    throw new Error('Order not found or unauthorized');
+  }
+
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod,
+    totalAmount: order.totalAmount,
+    createdAt: order.createdAt,
+    items: order.items.map(item => ({
+      id: item.id,
+      productName: item.productName,
+      color: item.color,
+      size: item.size,
+      quantity: item.quantity,
+      price: item.price,
+      subtotal: item.subtotal,
+      productImage: item.variant?.product?.variants?.[0]?.images?.[0]?.url
+    })),
+    shipment: order.shipments[0] ? {
+      status: order.shipments[0].status,
+      courierName: order.shipments[0].courierName,
+      trackingNumber: order.shipments[0].trackingNumber,
+      trackingUrl: order.shipments[0].trackingUrl,
+      shippedAt: order.shipments[0].shippedAt
+    } : null,
+    payments: order.payments.map(p => ({
+      gateway: p.gateway,
+      status: p.status,
+      amount: p.amount,
+      paidAt: p.paidAt
+    }))
+  };
+};
+
+const trackOrder = async (userId, orderId) => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      items: true,
+      shipments: true
+    }
+  });
+
+  if (!order || order.userId !== userId) {
+    throw new Error('Order not found or unauthorized');
+  }
+
+  const shipment = order.shipments[0];
+
+  return {
+    orderNumber: order.orderNumber,
+    status: order.status,
+    shipmentStatus: shipment?.status || 'PENDING',
+    shipmentDetails: shipment ? {
+      courierName: shipment.courierName,
+      trackingNumber: shipment.trackingNumber,
+      trackingUrl: shipment.trackingUrl,
+      shippedAt: shipment.shippedAt,
+      estimatedDelivery: shipment.shippedAt ? new Date(new Date(shipment.shippedAt).getTime() + 5 * 24 * 60 * 60 * 1000) : null
+    } : null,
+    itemCount: order.items.length,
+    totalAmount: order.totalAmount,
+    createdAt: order.createdAt
+  };
+};
+
+const cancelCustomerOrder = async (userId, orderId, reason = '') => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: true }
+  });
+
+  if (!order || order.userId !== userId) {
+    throw new Error('Order not found or unauthorized');
+  }
+
+  if (order.status === 'DELIVERED') {
+    throw new Error('Cannot cancel a delivered order. Contact support for return/refund.');
+  }
+
+  if (order.status === 'CANCELLED') {
+    throw new Error('Order is already cancelled');
+  }
+
+  if (order.status === 'SHIPPED') {
+    throw new Error('Cannot cancel a shipped order. Contact support for return/refund.');
+  }
+
+  // Cancel the order
+  const cancelledOrder = await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        status: 'CANCELLED',
+        paymentStatus: 'FAILED'
+      },
+      include: { items: true }
+    });
+
+    // Release inventory holds
+    for (const item of updated.items) {
+      await tx.inventoryLog.create({
+        data: {
+          variantId: item.variantId,
+          orderId,
+          type: 'RELEASE',
+          quantity: item.quantity,
+          note: `Order cancelled by customer. ${reason}`
+        }
+      });
+    }
+
+    return updated;
+  });
+
+  return {
+    message: 'Order cancelled successfully',
+    orderId: cancelledOrder.id,
+    orderNumber: cancelledOrder.orderNumber,
+    status: cancelledOrder.status
+  };
+};
+
 module.exports = {
-  // Order CRUD
+  // Order CRUD (Admin)
   getOrders,
   getOrderById,
-  // Status Management
+  // Status Management (Admin)
   updateOrderStatus,
   updatePaymentStatus,
-  // Shipment Management
+  // Shipment Management (Admin)
   createOrUpdateShipment,
   getOrderShipment,
-  // Analytics
+  // Analytics (Admin)
   getOrderAnalytics,
   // Cancellation
   cancelOrder,
   // Items
-  getOrderItems
+  getOrderItems,
+  // Customer-facing endpoints
+  createOrderFromCart,
+  getCustomerOrders,
+  getCustomerOrderDetail,
+  trackOrder,
+  cancelCustomerOrder
 };

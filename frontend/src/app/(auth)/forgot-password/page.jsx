@@ -5,8 +5,9 @@ import { ChevronLeft, Mail, MessageSquare } from 'lucide-react';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { authApi } from '@/lib/api';
+import PublicRoute from '@/components/PublicRoute';
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordContent() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -119,6 +120,14 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <PublicRoute>
+      <ForgotPasswordContent />
+    </PublicRoute>
   );
 }
 

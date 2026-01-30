@@ -42,12 +42,14 @@ const login = async (req, res, next) => {
       sameSite: 'none', 
       maxAge: 7 * 24 * 60 * 60 * 1000, 
     });
-    
+    console.log("User data on login:", user);
     // Send back user data (excluding sensitive fields) along with the token
     const userData = {
       id: user.id,
       fullName: user.fullName,
       userRole: user.role,
+      email: user.email,
+      phone: user.phone,
     };
     
     res.json({ user: userData });
@@ -89,13 +91,13 @@ const changePassword = async (req, res, next) => {
 const logout = async (req, res, next) => {
   try {
     // Get the refresh token from the cookie
-    const refreshToken = req.cookies.accessToken;
+    const accessToken = req.cookies.accessToken;
     console.log("Logging out user:", req.user.id);
-    await authService.logout(req.user.id, refreshToken);
+    // await authService.logout(req.user.id, accessToken);
     res.clearCookie('accessToken', {
       httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/' 
     });
     res.json({ message: 'Logged out successfully' });
@@ -217,12 +219,13 @@ const phoneLoginVerify = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/'
     });
-
     const userData = {
       id: result.user.id,
       phone: result.user.phone,
       fullName: result.user.fullName,
-      userRole: result.user.role,
+      userRole: result.user.userRole,
+      email: result.user.email,
+      phone: result.user.phone,
     };
 
     res.json({ user: userData, message: result.message });

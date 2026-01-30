@@ -5,6 +5,23 @@ const orderController = require('../controller/order.controller');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const { uploadInMemory } = require('../services/s3.services');
 
+// Custom error handling middleware for multipart uploads
+const handleMultipartError = (err, req, res, next) => {
+  if (err instanceof Error) {
+    if (err.message.includes('Unexpected end of form')) {
+      console.error('Multipart form error:', err.message);
+      return res.status(400).json({ 
+        message: 'Invalid file upload. Please ensure the file is properly formatted and Content-Type header is set correctly.',
+        error: err.message 
+      });
+    }
+    if (err.message.includes('Invalid file type')) {
+      return res.status(400).json({ message: err.message });
+    }
+  }
+  next(err);
+};
+
 // All routes require admin authentication
 router.use(verifyAdmin);
 
@@ -31,7 +48,7 @@ router.delete('/products/:productId', productController.deleteProduct);
 router.get('/variants/:variantId/images', productController.getProductImages);
 
 // Add image to variant (with file upload)
-router.post('/variants/:variantId/images', uploadInMemory.single('image'), productController.addProductImage);
+router.post('/variants/:variantId/images', uploadInMemory.single('image'), handleMultipartError, productController.addProductImage);
 
 // Update product image
 router.put('/images/:imageId', productController.updateProductImage);
@@ -45,6 +62,10 @@ router.delete('/images/:imageId', productController.deleteProductImage);
 router.get('/products/:productId/variants', productController.getProductVariants);
 
 // Create variant for product
+// Request body can include:
+// - Standard fields: size, color, sku, price, compareAtPrice, isAvailable, quantity
+// - Images: images[] with {buffer, altText, position, isPrimary} for new images
+// - Copy existing images: copyImagesFromVariantId (e.g., when creating same color, different size)
 router.post('/products/:productId/variants', productController.createProductVariant);
 
 // Update variant

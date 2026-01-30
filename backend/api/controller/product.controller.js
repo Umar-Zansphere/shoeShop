@@ -5,23 +5,114 @@ const { validateAndOptimizeImage } = require('../../utils/imageProcessor');
 
 const createProduct = async (req, res, next) => {
   try {
-    const { name, brand, modelNumber, category, gender, description, shortDescription, tags, isActive, isFeatured } = req.body;
+    console.log('Received req.body:', req.body);
+    console.log('Received files:', req.files?.length || 0);
+    
+    const { name, brand, modelNumber, category, gender, description, shortDescription, tags, isActive, isFeatured, variants } = req.body;
+
+    // Validate required fields
+    if (!name || !brand || !category || !gender) {
+      return res.status(400).json({ message: 'Missing required fields: name, brand, category, gender' });
+    }
+
+    // Validate and parse variants
+    if (!variants) {
+      return res.status(400).json({ message: 'At least one variant is required' });
+    }
+
+    let parsedVariants;
+    try {
+      parsedVariants = typeof variants === 'string' ? JSON.parse(variants) : variants;
+    } catch (e) {
+      console.error('Error parsing variants:', e);
+      return res.status(400).json({ message: 'Invalid variants format' });
+    }
+
+    if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
+      return res.status(400).json({ message: 'At least one variant is required' });
+    }
+
+    // Validate each variant has required fields
+    for (let i = 0; i < parsedVariants.length; i++) {
+      const variant = parsedVariants[i];
+      if (!variant.size || !variant.color || !variant.sku || !variant.price) {
+        return res.status(400).json({ 
+          message: `Variant ${i + 1} missing required fields: size, color, sku, price` 
+        });
+      }
+    }
+
+    // Map uploaded files to variants
+    if (req.files && req.files.length > 0) {
+      console.log('Processing files...');
+      for (const file of req.files) {
+        // File field name format: images_0, images_1, etc. to map to variant index
+        const match = file.fieldname.match(/images_(\d+)/);
+        if (match) {
+          const variantIndex = parseInt(match[1]);
+          if (variantIndex < parsedVariants.length) {
+            if (!parsedVariants[variantIndex].images) {
+              parsedVariants[variantIndex].images = [];
+            }
+            
+            // Validate and optimize image
+            const optimizedBuffer = await validateAndOptimizeImage(file.buffer);
+            
+            parsedVariants[variantIndex].images.push({
+              buffer: optimizedBuffer,
+              altText: `${name} - Variant ${variantIndex + 1}`,
+              position: parsedVariants[variantIndex].images.length,
+              isPrimary: parsedVariants[variantIndex].images.length === 0
+            });
+          }
+        }
+      }
+    }
+
+    // Parse boolean values from FormData
+    const isActiveValue = isActive === 'true' || isActive === true;
+    const isFeaturedValue = isFeatured === 'true' || isFeatured === true;
+
+    // Convert category and gender to uppercase (enum values)
+    const categoryValue = category.toUpperCase();
+    const genderValue = gender.toUpperCase();
+
+    // Validate enum values
+    const validCategories = ['RUNNING', 'CASUAL', 'FORMAL', 'SNEAKERS'];
+    const validGenders = ['MEN', 'WOMEN', 'UNISEX', 'KIDS'];
+
+    if (!validCategories.includes(categoryValue)) {
+      return res.status(400).json({ 
+        message: `Invalid category. Allowed values: ${validCategories.join(', ')}` 
+      });
+    }
+
+    if (!validGenders.includes(genderValue)) {
+      return res.status(400).json({ 
+        message: `Invalid gender. Allowed values: ${validGenders.join(', ')}` 
+      });
+    }
 
     const result = await productService.createProduct({
       name,
       brand,
       modelNumber,
-      category,
-      gender,
+      category: categoryValue,
+      gender: genderValue,
       description,
       shortDescription,
-      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',')) : [],
-      isActive,
-      isFeatured
+      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(t => t.trim())) : [],
+      isActive: isActiveValue,
+      isFeatured: isFeaturedValue,
+      variants: parsedVariants.map(v => ({
+        ...v,
+        quantity: v.quantity ? parseInt(v.quantity) : 0
+      }))
     });
 
     res.status(201).json(result);
   } catch (error) {
+    console.error('Error in createProduct:', error);
     next(error);
   }
 };
@@ -116,8 +207,17 @@ const addProductImage = async (req, res, next) => {
     }
 
     if (!req.file) {
+      console.error('No file received in request');
+      console.error('Request body:', req.body);
+      console.error('Request headers:', req.headers);
       return res.status(400).json({ message: 'Image file is required' });
     }
+
+    console.log('File received:', {
+      fieldname: req.file.fieldname,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    });
 
     // Validate and optimize image
     const optimizedBuffer = await validateAndOptimizeImage(req.file.buffer);
@@ -132,6 +232,7 @@ const addProductImage = async (req, res, next) => {
 
     res.status(201).json(result);
   } catch (error) {
+    console.error('Error in addProductImage:', error.message);
     next(error);
   }
 };
@@ -192,10 +293,21 @@ const deleteProductImage = async (req, res, next) => {
 const createProductVariant = async (req, res, next) => {
   try {
     const { productId } = req.params;
-    const { size, color, sku, price, compareAtPrice, isAvailable, quantity } = req.body;
+    const { size, color, sku, price, compareAtPrice, isAvailable, quantity, copyImagesFromVariantId, images } = req.body;
 
     if (!productId) {
       return res.status(400).json({ message: 'Product ID is required' });
+    }
+
+    // Convert base64 images to buffers if provided
+    let processedImages = null;
+    if (images && Array.isArray(images) && images.length > 0) {
+      processedImages = images.map((img) => ({
+        buffer: Buffer.from(img.buffer, 'base64'),
+        altText: img.altText,
+        position: img.position,
+        isPrimary: img.isPrimary
+      }));
     }
 
     const result = await productService.createProductVariant(productId, {
@@ -205,7 +317,9 @@ const createProductVariant = async (req, res, next) => {
       price,
       compareAtPrice,
       isAvailable,
-      quantity
+      quantity,
+      copyImagesFromVariantId,
+      images: processedImages
     });
 
     res.status(201).json(result);
@@ -341,6 +455,194 @@ const getInventoryLogs = async (req, res, next) => {
   }
 };
 
+// ======================== CUSTOMER-FACING PRODUCT CONTROLLERS ========================
+
+const getFilterOptions = async (req, res, next) => {
+  try {
+    const filters = await productService.getFilterOptions();
+    res.json({
+      success: true,
+      data: filters
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPopularProducts = async (req, res, next) => {
+  try {
+    const { skip, take } = req.query;
+    const result = await productService.getPopularProducts(skip, take);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getProductsByBrand = async (req, res, next) => {
+  try {
+    const { brandName } = req.params;
+    const { skip, take } = req.query;
+
+    if (!brandName) {
+      return res.status(400).json({ message: 'Brand name is required' });
+    }
+
+    const result = await productService.getProductsByBrand(brandName, skip, take);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getProductsByCategory = async (req, res, next) => {
+  try {
+    const { categoryName } = req.params;
+    const { skip, take } = req.query;
+
+    if (!categoryName) {
+      return res.status(400).json({ message: 'Category name is required' });
+    }
+
+    const result = await productService.getProductsByCategory(categoryName, skip, take);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getProductsByGender = async (req, res, next) => {
+  try {
+    const { genderName } = req.params;
+    const { skip, take } = req.query;
+
+    if (!genderName) {
+      return res.status(400).json({ message: 'Gender name is required' });
+    }
+
+    const result = await productService.getProductsByGender(genderName, skip, take);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getProductsByColor = async (req, res, next) => {
+  try {
+    const { colorName } = req.params;
+    const { skip, take } = req.query;
+
+    if (!colorName) {
+      return res.status(400).json({ message: 'Color name is required' });
+    }
+
+    const result = await productService.getProductsByColor(colorName, skip, take);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getProductsBySize = async (req, res, next) => {
+  try {
+    const { sizeValue } = req.params;
+    const { skip, take } = req.query;
+
+    if (!sizeValue) {
+      return res.status(400).json({ message: 'Size value is required' });
+    }
+
+    const result = await productService.getProductsBySize(sizeValue, skip, take);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getProductsByModel = async (req, res, next) => {
+  try {
+    const { modelNumber } = req.params;
+    const { skip, take } = req.query;
+
+    if (!modelNumber) {
+      return res.status(400).json({ message: 'Model number is required' });
+    }
+
+    const result = await productService.getProductsByModel(modelNumber, skip, take);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const searchProducts = async (req, res, next) => {
+  try {
+    const filters = req.query;
+    const result = await productService.searchProducts(filters);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getProductsList = async (req, res, next) => {
+  try {
+    const filters = req.query;
+    const result = await productService.getProductsList(filters);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getProductDetail = async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+
+    if (!productId) {
+      return res.status(400).json({ message: 'Product ID is required' });
+    }
+
+    const product = await productService.getProductDetail(productId);
+    res.json({
+      success: true,
+      data: product
+    });
+  } catch (error) {
+    if (error.message === 'Product not found') {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    next(error);
+  }
+};
+
 module.exports = {
   // Product
   createProduct,
@@ -362,5 +664,17 @@ module.exports = {
   updateInventory,
   getInventory,
   addInventoryLog,
-  getInventoryLogs
+  getInventoryLogs,
+  // Customer-facing controllers
+  getFilterOptions,
+  getPopularProducts,
+  getProductsByBrand,
+  getProductsByCategory,
+  getProductsByGender,
+  getProductsByColor,
+  getProductsBySize,
+  getProductsByModel,
+  searchProducts,
+  getProductsList,
+  getProductDetail
 };

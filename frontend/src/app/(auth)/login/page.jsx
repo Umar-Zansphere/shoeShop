@@ -5,9 +5,12 @@ import { Smartphone, Mail, Lock, ArrowRight } from 'lucide-react';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { authApi } from '@/lib/api';
+import { useMigrateStorageData } from '@/hooks/useMigrateStorageData';
+import PublicRoute from '@/components/PublicRoute';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const { migrate } = useMigrateStorageData();
   const [method, setMethod] = useState('phone'); // 'phone' | 'email'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -40,8 +43,17 @@ export default function LoginPage() {
         if (!res.ok) throw new Error(data.message || 'Login failed');
         
         // Save tokens (Assuming basic cookie/localstorage handling here)
+        if(data.user.fullName){
         localStorage.setItem("fullName", data.user.fullName);
+        }
         localStorage.setItem('userRole', data.user.userRole);
+        localStorage.setItem('phone', data.user.phone);
+        localStorage.setItem('isLoggedIn', 'true');
+        console.log("User Role after login:", data.user.userRole);
+        
+        // Migrate localStorage data to database
+        await migrate();
+        
         if(data.user.userRole === 'ADMIN'){
           router.push('/admin'); // Go to admin dashboard
         }else{
@@ -163,6 +175,14 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <PublicRoute>
+      <LoginContent />
+    </PublicRoute>
   );
 }
 

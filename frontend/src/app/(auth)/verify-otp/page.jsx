@@ -4,10 +4,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import { authApi } from '@/lib/api';
+import { useMigrateStorageData } from '@/hooks/useMigrateStorageData';
+import PublicRoute from '@/components/PublicRoute';
 
 // Separate component for reading search params to avoid hydration issues
 function VerifyContent() {
   const router = useRouter();
+  const { migrate } = useMigrateStorageData();
   const searchParams = useSearchParams();
   const phone = searchParams.get('phone');
   const mode = searchParams.get('mode'); // 'login' or 'signup'
@@ -64,9 +67,19 @@ function VerifyContent() {
       
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Verification failed');
+      console.log('Verification successful:', data);
 
       // Success
-      localStorage.setItem('accessToken', data.accessToken);
+      if(data.user.fullName){
+        localStorage.setItem('fullName', data.user.fullName);
+      }
+      localStorage.setItem('phone', data.user.phone);
+      localStorage.setItem('userRole', data.user.userRole);
+      localStorage.setItem('isLoggedIn', 'true');
+      
+      // Migrate localStorage data to database
+      await migrate();
+      
       router.push('/'); 
     } catch (err) {
       setError(err.message);
@@ -162,11 +175,21 @@ function VerifyContent() {
   );
 }
 
-export default function VerifyPage() {
+// export default function VerifyPage() {
+//   return (
+//     <PublicRoute>
+//       <Suspense fallback={<div className="min-h-screen bg-(--background) flex items-center justify-center">Loading...</div>}>
+//         <VerifyContent />
+//       </Suspense>
+//     </PublicRoute>
+//   );
+// }
+
+export default function VerifyOtpPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-(--background) flex items-center justify-center">Loading...</div>}>
+    <PublicRoute>
       <VerifyContent />
-    </Suspense>
+    </PublicRoute>
   );
 }
 

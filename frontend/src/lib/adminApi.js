@@ -26,18 +26,34 @@ export const productsApi = {
     if (filters.isActive !== undefined) params.append('isActive', filters.isActive);
     if (filters.search) params.append('search', filters.search);
     if (filters.skip) params.append('skip', filters.skip);
-    if (filters.take) params.append('take', filters.take);
+    if (filters.take) params.append('take', filters.take); 
 
     const res = await authenticatedFetch(`/api/admin/products?${params}`);
     return res.json();
   },
 
-  // Create product
+  // Create product (supports FormData for multipart uploads)
   createProduct: async (productData) => {
-    const res = await authenticatedFetch(`/api/admin/products`, {
+    const isFormData = productData instanceof FormData;
+    const options = {
       method: 'POST',
-      body: JSON.stringify(productData),
-    });
+      credentials: 'include',
+      body: productData,
+    };
+
+    // Only add headers if not FormData (let browser handle multipart)
+    if (!isFormData) {
+      options.headers = {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      };
+    } else {
+      options.headers = {
+        'ngrok-skip-browser-warning': 'true',
+      };
+    }
+
+    const res = await fetch(`/api/admin/products`, options);
     return res.json();
   },
 

@@ -80,7 +80,7 @@ const login = async (email, password, req) => {
   if (!passwordMatch) {
     throw new Error('Invalid password');
   }
-  if (!user.is_email_verified) {
+  if (user.is_email_verified === null) {
     throw new Error('Please verify your email.');
   }
   const {accessToken} = generateTokens(user);
@@ -405,7 +405,7 @@ const phoneSignupVerify = async (phoneNumber, otp) => {
   try {
     // Validate OTP format
     if (!/^\d{6}$/.test(otp)) {
-      throw new Error('Invalid verification code format.');
+      throw new Error('Invalid verification code format.'); 
     }
 
     const otpHash = hashOTP(otp);
@@ -468,6 +468,15 @@ const phoneSignupVerify = async (phoneNumber, otp) => {
       });
     }
 
+    // Mark OTP as verified AND link it to the User ID
+    await prisma.otpVerification.update({
+      where: { id: otpVerification.id },
+      data: { 
+        verifiedAt: now,
+        userId: user.id // Link the OTP record to the created/found user
+      },
+    });
+
     // Generate tokens
     const { accessToken } = generateTokens(user);
 
@@ -477,7 +486,10 @@ const phoneSignupVerify = async (phoneNumber, otp) => {
       accessToken,
       user: {
         id: user.id,
+        fullName: user.fullName,
+        userRole: user.role,
         phone: user.phone,
+        email: user.email,
         is_phone_verified: user.is_phone_verified,
       }
     };
@@ -617,6 +629,8 @@ const phoneLoginVerify = async (phoneNumber, otp, req) => {
         id: user.id,
         phone: user.phone,
         fullName: user.fullName,
+        userRole: user.role,
+        is_phone_verified: user.is_phone_verified,
         email: user.email,
       }
     };
