@@ -7,11 +7,14 @@ import Header from '@/app/components/Header';
 import Sidebar from '@/app/components/Sidebar';
 import Footer from '@/app/components/Footer';
 import ProductCard from '@/app/components/ProductCard';
-import { productApi } from '@/lib/api';
+import { productApi, cartApi, wishlistApi } from '@/lib/api';
+import { useToast } from '@/components/ToastContext';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton';
 
 export default function ProductsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { showToast } = useToast();
 
   // URL Parameters
   const search = searchParams.get('search') || '';
@@ -123,26 +126,55 @@ export default function ProductsPage() {
     loadProducts();
   }, [search, category, gender, brand, color, size, minPrice, maxPrice, page]);
 
-  const toggleWishlist = (productId) => {
-    setWishlist((prev) => {
-      const newSet = new Set(prev);
-      newSet.has(productId) ? newSet.delete(productId) : newSet.add(productId);
-      return newSet;
-    });
+  const toggleWishlist = async ({ productId, variantId }) => {
+    const isCurrentlyLiked = wishlist.has(productId);
+
+    try {
+      if (isCurrentlyLiked) {
+        // Remove from wishlist
+        setWishlist((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(productId);
+          return newSet;
+        });
+        showToast('Removed from wishlist', 'info');
+      } else {
+        // Add to wishlist
+        const response = await wishlistApi.addToWishlist(productId, variantId);
+        setWishlist((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(productId);
+          return newSet;
+        });
+        showToast(response.toast?.message || 'Added to wishlist', 'success');
+      }
+    } catch (error) {
+      console.error('Error toggling wishlist:', error);
+      showToast('Failed to update wishlist', 'error');
+    }
   };
 
-  const handleAddToCart = (cartItem) => {
-    setCart((prev) => {
-      const existing = prev.find(item => item.variantId === cartItem.variantId);
-      if (existing) {
-        return prev.map(item =>
-          item.variantId === cartItem.variantId
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prev, { ...cartItem, quantity: 1 }];
-    });
+  const handleAddToCart = async ({ variantId, productId, price }) => {
+    try {
+      const response = await cartApi.addToCart(variantId, 1);
+
+      setCart((prev) => {
+        const existing = prev.find(item => item.variantId === variantId);
+        if (existing) {
+          return prev.map(item =>
+            item.variantId === variantId
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          );
+        }
+        return [...prev, { variantId, productId, quantity: 1, price }];
+      });
+
+      showToast(response.toast?.message || 'Added to cart', 'success');
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      showToast('Failed to add to cart', 'error');
+    }
   };
 
   const toggleFilter = (filter) => {
@@ -186,7 +218,7 @@ export default function ProductsPage() {
     <div className="min-h-screen bg-white">
       <Header
         onSidebarOpen={() => setSidebarOpen(true)}
-        onCartOpen={() => {}}
+        onCartOpen={() => { }}
         cart={cart}
         user={user}
       />
@@ -196,7 +228,7 @@ export default function ProductsPage() {
         onClose={() => setSidebarOpen(false)}
         user={user}
         onLogout={() => setUser(null)}
-        onAuthRequest={() => {}}
+        onAuthRequest={() => { }}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -684,9 +716,7 @@ export default function ProductsPage() {
 
             {/* Loading State */}
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#FF6B6B]"></div>
-              </div>
+              <LoadingSkeleton />
             ) : error ? (
               <div className="text-center py-12">
                 <p className="text-red-600 mb-4">{error}</p>
@@ -756,11 +786,10 @@ export default function ProductsPage() {
                             params.set('page', p.toString());
                             router.push(`/products?${params.toString()}`);
                           }}
-                          className={`w-10 h-10 rounded-lg border ${
-                            page === p
+                          className={`w-10 h-10 rounded-lg border ${page === p
                               ? 'bg-[#FF6B6B] text-white border-[#FF6B6B]'
                               : 'border-gray-300 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           {p}
                         </button>

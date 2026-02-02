@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const cartController = require('../controller/cart.controller');
-const { verifyToken } = require('../middleware/auth.middleware');
+const { optionalAuth, extractSession } = require('../middleware/auth.middleware');
 
-// All wishlist routes require authentication
-router.use(verifyToken);
+// All wishlist routes support both authenticated users and guest sessions
+router.use(optionalAuth);
+router.use(extractSession);
 
 // ======================== WISHLIST ROUTES ========================
 
@@ -24,3 +25,4 @@ router.post('/:wishlistItemId/move-to-cart', cartController.moveToCart);
 router.delete('/', cartController.clearWishlist);
 
 module.exports = router;
+

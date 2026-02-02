@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/app/components/Header';
 import Footer from '@/app/components/Footer';
+import LoginPrompt from '@/components/LoginPrompt';
 import { addressApi } from '@/lib/api';
 import {
   AlertCircle,
@@ -52,7 +53,8 @@ export default function AddressesPage() {
       const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
 
       if (!isLoggedIn) {
-        router.push('/login?redirect=/profile/addresses');
+        // Don't redirect, just stop loading to show login prompt
+        setLoading(false);
         return;
       }
 
@@ -211,6 +213,22 @@ export default function AddressesPage() {
             <p className="text-slate-600">Loading addresses...</p>
           </div>
         </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Show login prompt if not logged in
+  const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <Header />
+        <LoginPrompt
+          title="Manage Your Addresses"
+          message="Log in to save and manage your delivery addresses for faster checkout"
+          showGuestOption={true}
+        />
         <Footer />
       </div>
     );
@@ -481,9 +499,8 @@ export default function AddressesPage() {
             {addresses.map((address) => (
               <div
                 key={address.id}
-                className={`bg-white rounded-3xl shadow-md p-6 border-2 transition ${
-                  address.isDefault ? 'border-[#FF5252] bg-orange-50' : 'border-slate-200 hover:border-slate-300'
-                }`}
+                className={`bg-white rounded-3xl shadow-md p-6 border-2 transition ${address.isDefault ? 'border-[#FF5252] bg-orange-50' : 'border-slate-200 hover:border-slate-300'
+                  }`}
               >
                 {/* Default Badge */}
                 {address.isDefault && (

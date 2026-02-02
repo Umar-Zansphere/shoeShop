@@ -2,6 +2,15 @@
 const nextConfig = {
   /* config options here */
   reactCompiler: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+    formats: ['image/webp', 'image/avif'],
+  },
   rewrites: async () => {
     return [
       {
@@ -13,3 +22,4 @@ const nextConfig = {
 };
 
 export default nextConfig;
+

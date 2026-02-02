@@ -2,15 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { Filter } from 'lucide-react';
+import Image from 'next/image';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
-import Footer from './components/Footer';
+// import Footer from './components/Footer';
 import BrandScroller from './components/BrandScroller';
 import ProductCard from './components/ProductCard';
-import { productApi, cartApi, wishlistApi, storageApi } from '@/lib/api';
+import { productApi, cartApi, wishlistApi } from '@/lib/api';
+import { useToast } from '@/components/ToastContext';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton';
 import Link from 'next/link';
 
 export default function Home() {
+  const { showToast } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
@@ -18,126 +22,62 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState(new Set());
-  
+
   // Data fetching states
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   // Fetch popular products on mount
   useEffect(() => {
     const loadPopularProducts = async () => {
       try {
         setLoading(true);
-        setError(null);
         const data = await productApi.getPopularProducts({ skip: 0, take: 8 });
-        console.log(data);
         setProducts(data.data?.products || []);
       } catch (err) {
         console.error('Failed to load products:', err);
-        setError('Failed to load products. Please try again.');
+        showToast('Failed to load products. Please try again.', 'error');
       } finally {
         setLoading(false);
       }
     };
 
-    // Initialize wishlist from localStorage for non-logged-in users
-    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    if (!isLoggedIn) {
-      const storedWishlist = storageApi.getWishlist();
-      const wishlistSet = new Set(storedWishlist.map(item => item.productId));
-      setWishlist(wishlistSet);
-      console.log('Initialized wishlist from localStorage:', wishlistSet);
-    }
-
     loadPopularProducts();
-  }, []);
+  }, [showToast]);
 
   const toggleWishlist = async ({ productId, variantId }) => {
-    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
     const isCurrentlyLiked = wishlist.has(productId);
-    
+
     try {
-      if (isLoggedIn) {
-        // Call backend API
-        if (isCurrentlyLiked) {
-          // Remove from wishlist
-          console.log('Remove from wishlist for:', productId);
-          // TODO: Implement removal when we have the wishlist item ID
-        } else {
-          // Add to wishlist
-          console.log('Adding to wishlist:', { productId, variantId });
-          const response = await wishlistApi.addToWishlist(productId, variantId);
-          console.log('Wishlist API response:', response);
-        }
-        
-        // Update local state
+      if (isCurrentlyLiked) {
+        // Remove from wishlist - need wishlist item ID
+        // For now, just update local state
         setWishlist((prev) => {
           const newSet = new Set(prev);
-          newSet.has(productId) ? newSet.delete(productId) : newSet.add(productId);
+          newSet.delete(productId);
           return newSet;
         });
+        showToast('Removed from wishlist', 'info');
       } else {
-        // Non-logged-in user - use localStorage
-        const wishlistItem = {
-          id: `wishlist-${variantId}`,
-          productId,
-          variantId,
-        };
-        
-        const currentWishlist = storageApi.getWishlist();
-        const exists = currentWishlist.some(w => w.productId === productId);
-        
-        if (exists) {
-          console.log('Removing from localStorage wishlist:', productId);
-          storageApi.removeFromWishlist(`wishlist-${variantId}`);
-        } else {
-          console.log('Adding to localStorage wishlist:', wishlistItem);
-          storageApi.addToWishlist(wishlistItem);
-        }
-        
-        // Update local state
+        // Add to wishlist
+        const response = await wishlistApi.addToWishlist(productId, variantId);
         setWishlist((prev) => {
           const newSet = new Set(prev);
-          newSet.has(productId) ? newSet.delete(productId) : newSet.add(productId);
+          newSet.add(productId);
           return newSet;
         });
+        showToast(response.toast?.message || 'Added to wishlist', 'success');
       }
     } catch (error) {
       console.error('Error toggling wishlist:', error);
-      alert('Failed to update wishlist. Please try again.');
+      showToast('Failed to update wishlist. Please try again.', 'error');
     }
   };
 
   const handleAddToCart = async ({ variantId, productId, quantity = 1, price }) => {
-    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    
     try {
-      if (isLoggedIn) {
-        // Call backend API
-        await cartApi.addToCart(variantId, quantity);
-      } else {
-        // Non-logged-in user - use localStorage
-        const product = products.find(p => p.id === productId);
-        const variant = product?.variants?.find(v => v.id === variantId);
-        
-        storageApi.addToCart({
-          id: `cart-${variantId}`,
-          productId,
-          variantId,
-          quantity,
-          unitPrice: price,
-          product: {
-            id: productId,
-            name: product?.name,
-            brand: product?.brand,
-            category: product?.category,
-            gender: product?.gender
-          },
-          variant
-        });
-      }
-      
+      const response = await cartApi.addToCart(variantId, quantity);
+
       // Update local cart state
       setCart((prev) => {
         const existing = prev.find(item => item.variantId === variantId);
@@ -150,8 +90,11 @@ export default function Home() {
         }
         return [...prev, { variantId, productId, quantity, price }];
       });
+
+      showToast(response.toast?.message || 'Added to cart', 'success');
     } catch (error) {
       console.error('Error adding to cart:', error);
+      showToast('Failed to add to cart. Please try again.', 'error');
     }
   };
 
@@ -175,20 +118,23 @@ export default function Home() {
       <main className="max-w-7xl mx-auto pt-4 px-4 sm:px-6">
         {/* Hero Banner */}
         <div className="relative mb-10 w-full rounded-[2.5rem] overflow-hidden shadow-2xl h-90 sm:h-112.5 group">
-          <img 
-            src="https://images.unsplash.com/photo-1556906781-9a412961c28c?auto=format&fit=crop&q=80&w=1600" 
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          <Image
+            src="https://images.unsplash.com/photo-1556906781-9a412961c28c?auto=format&fit=crop&q=80&w=1600"
             alt="Banner"
+            fill
+            sizes="(max-width: 1280px) 100vw, 1280px"
+            className="object-cover transition-transform duration-700 group-hover:scale-105"
+            priority
           />
           <div className="absolute inset-0 bg-linear-to-r from-black/80 via-black/40 to-transparent" />
-          
+
           <div className="relative h-full flex flex-col justify-center px-8 sm:px-12 z-10 max-w-xl">
             <div className="inline-flex items-center gap-2 mb-4">
               <span className="h-0.5 w-8 bg-[#FF6B6B]"></span>
               <span className="text-[#FF6B6B] font-bold tracking-widest text-xs uppercase">New Collection</span>
             </div>
             <h2 className="text-4xl sm:text-6xl font-extrabold text-white mb-6 leading-[1.1]">
-              Run Faster.<br/>
+              Run Faster.<br />
               <span className="text-gray-300">Go Further.</span>
             </h2>
             <p className="text-gray-300 mb-8 max-w-sm text-lg">Engineered for the modern athlete. Experience comfort like never before.</p>
@@ -210,21 +156,9 @@ export default function Home() {
               </button>
             </Link>
           </div>
-          
+
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FF6B6B]"></div>
-            </div>
-          ) : error ? (
-            <div className="text-center py-12">
-              <p className="text-red-600 mb-4">{error}</p>
-              <button 
-                onClick={() => window.location.reload()}
-                className="px-6 py-2 bg-[#FF6B6B] text-white rounded-lg hover:bg-[#FF5252]"
-              >
-                Retry
-              </button>
-            </div>
+            <LoadingSkeleton />
           ) : products.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-600 mb-4">No products available yet. Check back soon!</p>
@@ -232,9 +166,9 @@ export default function Home() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-6 px-2">
               {products.map((product) => (
-                <ProductCard 
-                  key={product.id} 
-                  product={product} 
+                <ProductCard
+                  key={product.id}
+                  product={product}
                   isLiked={wishlist.has(product.id)}
                   onToggleLike={toggleWishlist}
                   onAddToCart={handleAddToCart}
@@ -256,7 +190,7 @@ export default function Home() {
         )}
       </main>
 
-      <Footer activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* <Footer activeTab={activeTab} onTabChange={setActiveTab} /> */}
     </div>
   );
 }

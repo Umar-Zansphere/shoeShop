@@ -1,6 +1,6 @@
 'use client';
 
-import { X, LogOut } from 'lucide-react';
+import { X, LogOut, ChevronRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { productApi, authApi } from '@/lib/api';
@@ -22,7 +22,7 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
       try {
         const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
         setIsLoggedIn(loggedIn);
-        
+
         if (loggedIn) {
           setUserName(localStorage.getItem('fullName'));
           setUserRole(localStorage.getItem('userRole'));
@@ -78,7 +78,7 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
     try {
       // 1. Call the API to invalidate session/cookie on server
       await authApi.logout();
-      
+
       // 2. Clear Client Storage
       localStorage.clear();
 
@@ -88,10 +88,10 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
       setIsLoggedIn(false);
 
       // 4. Show success modal
-      setLogoutModal({ 
-        isOpen: true, 
-        type: 'success', 
-        message: 'You have been logged out successfully!' 
+      setLogoutModal({
+        isOpen: true,
+        type: 'success',
+        message: 'You have been logged out successfully!'
       });
 
       // 5. Trigger callbacks
@@ -99,12 +99,12 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
       onClose();
     } catch (error) {
       console.error('Logout API call failed:', error);
-      
+
       // Show error modal instead of failing silently
-      setLogoutModal({ 
-        isOpen: true, 
-        type: 'error', 
-        message: 'Logout failed. Please try again.' 
+      setLogoutModal({
+        isOpen: true,
+        type: 'error',
+        message: 'Logout failed. Please try again.'
       });
     }
   };
@@ -117,43 +117,50 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
   return (
     <>
       {/* Backdrop */}
-      <div 
-        className={`fixed inset-0 z-40 bg-black/20 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+      <div
+        className={`fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
-      
+
       {/* Sidebar Content */}
-      <div className={`fixed top-0 left-0 h-full w-[80%] max-w-sm z-90 bg-[#1E293B] text-white shadow-2xl transform transition-transform duration-300 ease-out overflow-y-auto ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed top-0 left-0 h-full w-[85%] max-w-sm z-50 bg-slate-900 text-white shadow-2xl transform transition-transform duration-300 ease-out overflow-y-auto ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex flex-col min-h-full">
+          {/* Header */}
           <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-bold tracking-tight text-white">SoleMate</h2>
-            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Close menu">
+            <h2 className="text-2xl font-black tracking-tight text-white">
+              SoleMate<span className="text-orange-500">.</span>
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2.5 hover:bg-white/10 rounded-xl transition-all active:scale-95 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Close menu"
+            >
               <X size={24} className="text-gray-300" />
             </button>
           </div>
 
           {/* User Section */}
-          <div className="mb-8 p-4 bg-white/5 rounded-2xl border border-white/10">
+          <div className="mb-8 p-5 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
             {isLoggedIn ? (
               <button
                 onClick={() => handleNavigate('/profile')}
-                className="w-full flex items-center gap-4 hover:bg-white/10 rounded-lg transition-colors p-1 -m-1"
+                className="w-full flex items-center gap-4 hover:bg-white/10 rounded-xl transition-all p-2 -m-2 active:scale-98 touch-manipulation"
               >
-                <div className="w-12 h-12 rounded-full bg-(--accent) flex items-center justify-center text-white font-bold text-lg shrink-0">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xl shrink-0 shadow-lg">
                   {userName ? userName[0].toUpperCase() : 'U'}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="font-medium text-white truncate">{userName || 'User'}</p>
-                  {phone && <p className="text-xs text-gray-400 truncate">{phone || user.email || 'No Phone/email'}</p>}
-                  {/* {userRole && <p className="text-xs text-gray-500 capitalize mt-1">{userRole}</p>} */}
+                  <p className="font-bold text-white truncate text-base">{userName || 'User'}</p>
+                  {phone && <p className="text-xs text-gray-400 truncate mt-0.5">{phone}</p>}
                 </div>
+                <ChevronRight size={20} className="text-gray-400" />
               </button>
             ) : (
               <div className="text-center">
-                <p className="text-gray-400 mb-4 text-sm">Sign in to sync your wishlist and orders.</p>
-                <button 
+                <p className="text-gray-400 mb-4 text-sm leading-relaxed">Sign in to sync your wishlist and orders.</p>
+                <button
                   onClick={() => { handleNavigate('/login'); }}
-                  className="w-full py-3 bg-(--accent) text-white rounded-xl font-semibold hover:bg-[#FF5252] transition-colors duration-300"
+                  className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl active:scale-95 touch-manipulation"
                 >
                   Login / Signup
                 </button>
@@ -164,21 +171,21 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
           {/* Quick Navigation */}
           <nav className="mb-6 space-y-1">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-2">Shop</p>
-            <button 
+            <button
               onClick={() => handleNavigate('/products?isFeatured=true')}
-              className="w-full text-left py-3 px-4 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+              className="w-full text-left py-3.5 px-4 rounded-xl text-gray-300 hover:text-white hover:bg-white/10 transition-all active:scale-98 touch-manipulation"
             >
               🌟 New Arrivals
             </button>
-            <button 
+            <button
               onClick={() => handleNavigate('/products?isFeatured=true')}
-              className="w-full text-left py-3 px-4 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+              className="w-full text-left py-3.5 px-4 rounded-xl text-gray-300 hover:text-white hover:bg-white/10 transition-all active:scale-98 touch-manipulation"
             >
               ⭐ Featured
             </button>
-            <button 
+            <button
               onClick={() => handleNavigate('/products')}
-              className="w-full text-left py-3 px-4 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+              className="w-full text-left py-3.5 px-4 rounded-xl text-gray-300 hover:text-white hover:bg-white/10 transition-all active:scale-98 touch-manipulation"
             >
               👟 All Products
             </button>
@@ -189,14 +196,13 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-2">By Gender</p>
             <div className="space-y-2">
               {['MEN', 'WOMEN', 'UNISEX', 'KIDS'].map((gender) => (
-                <button 
+                <button
                   key={gender}
                   onClick={() => handleGenderFilter(gender)}
-                  className={`w-full text-left py-2.5 px-4 rounded-lg text-sm transition-all ${
-                    selectedGender === gender 
-                      ? 'bg-white/10 text-white font-medium' 
-                      : 'text-gray-400 hover:text-white hover:bg-white/5'
-                  }`}
+                  className={`w-full text-left py-3 px-4 rounded-xl text-sm transition-all active:scale-98 touch-manipulation ${selectedGender === gender
+                      ? 'bg-white/15 text-white font-bold shadow-lg'
+                      : 'text-gray-300 hover:text-white hover:bg-white/10'
+                    }`}
                 >
                   {gender.charAt(0) + gender.slice(1).toLowerCase()}
                 </button>
@@ -209,10 +215,10 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-2">By Category</p>
             <div className="space-y-2">
               {['RUNNING', 'CASUAL', 'FORMAL', 'SNEAKERS'].map((category) => (
-                <button 
+                <button
                   key={category}
                   onClick={() => handleCategoryFilter(category)}
-                  className="w-full text-left py-2.5 px-4 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+                  className="w-full text-left py-3 px-4 rounded-xl text-sm text-gray-300 hover:text-white hover:bg-white/10 transition-all active:scale-98 touch-manipulation"
                 >
                   {category.charAt(0) + category.slice(1).toLowerCase()}
                 </button>
@@ -226,13 +232,13 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-2">Popular Brands</p>
               <div className="space-y-2">
                 {filterOptions.brands.slice(0, 5).map((brand) => (
-                  <button 
+                  <button
                     key={brand}
                     onClick={() => {
                       router.push(`/products?brand=${encodeURIComponent(brand)}`);
                       onClose();
                     }}
-                    className="w-full text-left py-2.5 px-4 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+                    className="w-full text-left py-3 px-4 rounded-xl text-sm text-gray-300 hover:text-white hover:bg-white/10 transition-all active:scale-98 touch-manipulation"
                   >
                     {brand}
                   </button>
@@ -243,10 +249,10 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
 
           {/* Footer Actions */}
           <div className="mt-auto pt-6 border-t border-white/10">
-            {isLoggedIn  && (
-              <button 
+            {isLoggedIn && (
+              <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 py-4 px-4 text-red-400 hover:bg-red-400/10 rounded-xl transition-colors"
+                className="w-full flex items-center justify-center gap-3 py-4 px-4 text-red-400 hover:bg-red-400/10 rounded-xl transition-all active:scale-95 touch-manipulation font-medium"
               >
                 <LogOut size={20} />
                 <span>Logout</span>
@@ -259,18 +265,17 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
 
       {/* Logout Modal */}
       {logoutModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+
           {/* Modal Content */}
-          <div className="relative bg-white rounded-3xl shadow-2xl p-8 max-w-sm mx-4 animate-in fade-in zoom-in-95">
+          <div className="relative bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full animate-in fade-in zoom-in-95 duration-200">
             {/* Icon */}
-            <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-6 ${
-              logoutModal.type === 'success' 
-                ? 'bg-green-100' 
+            <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-6 ${logoutModal.type === 'success'
+                ? 'bg-green-100'
                 : 'bg-red-100'
-            }`}>
+              }`}>
               {logoutModal.type === 'success' ? (
                 <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -283,11 +288,10 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
             </div>
 
             {/* Title */}
-            <h2 className={`text-center text-2xl font-bold mb-2 ${
-              logoutModal.type === 'success' 
-                ? 'text-slate-900' 
+            <h2 className={`text-center text-2xl font-bold mb-2 ${logoutModal.type === 'success'
+                ? 'text-slate-900'
                 : 'text-red-600'
-            }`}>
+              }`}>
               {logoutModal.type === 'success' ? 'Logout Successful' : 'Logout Failed'}
             </h2>
 
@@ -299,11 +303,10 @@ const Sidebar = ({ isOpen, onClose, user: propUser, onLogout, onAuthRequest }) =
             {/* Button */}
             <button
               onClick={handleModalClose}
-              className={`w-full py-3 px-4 rounded-xl font-semibold text-white transition-colors ${
-                logoutModal.type === 'success'
+              className={`w-full py-3.5 px-4 rounded-xl font-bold text-white transition-all active:scale-95 touch-manipulation ${logoutModal.type === 'success'
                   ? 'bg-green-600 hover:bg-green-700'
                   : 'bg-red-600 hover:bg-red-700'
-              }`}
+                }`}
             >
               Go to Home
             </button>

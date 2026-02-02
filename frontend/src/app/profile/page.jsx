@@ -22,7 +22,7 @@ export default function ProfilePage() {
         const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
 
         if (!isLoggedIn) {
-          router.push('/login?redirect=/profile');
+          router.push('/');
           return;
         }
 

@@ -124,35 +124,9 @@ export default function ProductDetailsPage() {
 
     setIsAddingToCart(true);
     setCartMessage(null);
-
-    try {
-      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-
-      if (isLoggedIn) {
-        // API call for logged-in users
         console.log('Adding to cart via API:', { variantId: currentVariant.id, quantity: 1 });
         await cartApi.addToCart(currentVariant.id, 1);
-      } else {
-        // localStorage for non-logged-in users
-        const cartItem = {
-          id: `cart-${currentVariant.id}`,
-          productId: product.id,
-          variantId: currentVariant.id,
-          quantity: 1,
-          unitPrice: currentVariant.price,
-          product: {
-            id: product.id,
-            name: product.name,
-            brand: product.brand,
-            category: product.category,
-            gender: product.gender
-          },
-          variant: currentVariant
-        };
-        console.log('Adding to localStorage cart:', cartItem);
-        storageApi.addToCart(cartItem);
-      }
-
+      try {
       setCartMessage({ type: 'success', text: 'Added to cart!' });
       setTimeout(() => setCartMessage(null), 3000);
     } catch (err) {
@@ -172,47 +146,19 @@ export default function ProductDetailsPage() {
     setWishlistMessage(null);
 
     try {
-      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-
-      if (isLoggedIn) {
-        // API call for logged-in users
-        if (isLiked) {
-          console.log('Removing from wishlist via API');
-          // Note: We'd need the wishlist item ID to remove - for now just update state
-        } else {
           console.log('Adding to wishlist via API:', { productId, variantId: currentVariant.id });
           await wishlistApi.addToWishlist(product.id, currentVariant.id);
-        }
-      } else {
-        // localStorage for non-logged-in users
-        const wishlistItem = {
-          id: `wishlist-${currentVariant.id}`,
-          productId: product.id,
-          variantId: currentVariant.id,
-        };
-
-        const currentWishlist = storageApi.getWishlist();
-        const exists = currentWishlist.some(w => w.productId === product.id);
-
-        if (exists) {
-          console.log('Removing from localStorage wishlist');
-          storageApi.removeFromWishlist(`wishlist-${currentVariant.id}`);
-        } else {
-          console.log('Adding to localStorage wishlist:', wishlistItem);
-          storageApi.addToWishlist(wishlistItem);
-        }
-      }
-
+      } catch (err) {
+      console.error('Error toggling wishlist:', err);
+      setWishlistMessage({ type: 'error', text: err.message || 'Failed to update wishlist' });
+    }
       setIsLiked(!isLiked);
       setWishlistMessage({ 
         type: 'success', 
         text: isLiked ? 'Removed from wishlist' : 'Added to wishlist!' 
       });
       setTimeout(() => setWishlistMessage(null), 3000);
-    } catch (err) {
-      console.error('Error toggling wishlist:', err);
-      setWishlistMessage({ type: 'error', text: err.message || 'Failed to update wishlist' });
-    }
+    
   };
 
   return (

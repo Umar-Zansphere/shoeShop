@@ -4,101 +4,73 @@ import { useState, useEffect } from 'react';
 import { Trash2, ShoppingBag, Heart, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Header from '@/app/components/Header';
 import Footer from '@/app/components/Footer';
-import { wishlistApi, storageApi } from '@/lib/api';
+import { wishlistApi } from '@/lib/api';
+import { useToast } from '@/components/ToastContext';
+import { WishlistLoadingSkeleton } from '@/components/LoadingSkeleton';
 
 export default function WishlistPage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [wishlistItems, setWishlistItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [addingToCart, setAddingToCart] = useState({});
 
-  // Fetch wishlist data
+  // Fetch wishlist data (works for both guest and authenticated users)
   useEffect(() => {
     const loadWishlist = async () => {
       try {
         setLoading(true);
-        setError(null);
+        const response = await wishlistApi.getWishlist();
+        setWishlistItems(response.items || []);
 
-        // Check if user is logged in
-        const isLoggedin = localStorage.getItem('isLoggedIn') === 'true';
-        if (isLoggedin) {
-          setIsLoggedIn(true);
-          // Fetch from API
-          const response = await wishlistApi.getWishlist();
-          setWishlistItems(response.items || []);
-        } else {
-          setIsLoggedIn(false);
-          // Load from localStorage
-          const storedWishlist = storageApi.getWishlist();
-          setWishlistItems(storedWishlist);
+        if (response.toast) {
+          showToast(response.toast.message, response.toast.type);
         }
       } catch (err) {
         console.error('Error loading wishlist:', err);
-        setError('Failed to load wishlist. Please try again.');
-        // Fallback to localStorage
-        const storedWishlist = storageApi.getWishlist();
-        setWishlistItems(storedWishlist);
+        showToast('Failed to load wishlist. Please try again.', 'error');
+        setWishlistItems([]);
       } finally {
         setLoading(false);
       }
     };
 
     loadWishlist();
-  }, []);
+  }, [showToast]);
 
   // Remove item from wishlist
   const handleRemoveItem = async (itemId) => {
     try {
-      if (isLoggedIn) {
-        // Remove from database
-        await wishlistApi.removeFromWishlist(itemId);
-      } else {
-        // Remove from localStorage
-        storageApi.removeFromWishlist(itemId);
-      }
+      const response = await wishlistApi.removeFromWishlist(itemId);
       setWishlistItems(prev => prev.filter(item => item.id !== itemId));
+
+      showToast(response.toast?.message || 'Item removed from wishlist', 'success');
     } catch (err) {
       console.error('Error removing item:', err);
-      setError('Failed to remove item from wishlist');
+      showToast('Failed to remove item from wishlist', 'error');
     }
   };
 
   // Move to cart
   const handleMoveToCart = async (item) => {
     if (!item.variantId) {
-      setError('Please select a variant before adding to cart');
+      showToast('Please select a variant before adding to cart', 'warning');
       return;
     }
 
     try {
       setAddingToCart(prev => ({ ...prev, [item.id]: true }));
 
-      if (isLoggedIn) {
-        // Move to cart via API
-        await wishlistApi.moveToCart(item.id);
-        setWishlistItems(prev => prev.filter(w => w.id !== item.id));
-      } else {
-        // Add to localStorage cart
-        storageApi.addToCart({
-          id: `cart-${item.variantId}`,
-          productId: item.productId,
-          variantId: item.variantId,
-          quantity: 1,
-          unitPrice: item.variant?.price || 0,
-          product: item.product,
-          variant: item.variant
-        });
-        // Remove from wishlist
-        storageApi.removeFromWishlist(item.id);
-        setWishlistItems(prev => prev.filter(w => w.id !== item.id));
-      }
+      const response = await wishlistApi.moveToCart(item.id);
+      setWishlistItems(prev => prev.filter(w => w.id !== item.id));
+
+      showToast(response.toast?.message || 'Item moved to cart', 'success');
     } catch (err) {
       console.error('Error moving to cart:', err);
-      setError('Failed to move item to cart');
+      showToast('Failed to move item to cart', 'error');
     } finally {
       setAddingToCart(prev => ({ ...prev, [item.id]: false }));
     }
@@ -106,16 +78,9 @@ export default function WishlistPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <div className="animate-spin mb-4">
-              <Heart size={40} className="text-gray-400" />
-            </div>
-            <p className="text-gray-500">Loading wishlist...</p>
-          </div>
-        </div>
+        <WishlistLoadingSkeleton />
         <Footer />
       </div>
     );
@@ -136,11 +101,6 @@ export default function WishlistPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
-          </div>
-        )}
 
         {wishlistItems.length === 0 ? (
           <div className="bg-white rounded-lg p-12 text-center">
@@ -168,12 +128,15 @@ export default function WishlistPage() {
                   <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition">
                     {/* Product Image */}
                     <Link href={`/product/${item.productId}`}>
-                      <div className="w-full h-56 bg-gray-100 overflow-hidden flex items-center justify-center cursor-pointer hover:bg-gray-200 transition">
+                      <div className="w-full h-56 bg-gray-100 overflow-hidden flex items-center justify-center cursor-pointer hover:bg-gray-200 transition relative">
                         {item.variant?.images?.[0]?.url ? (
-                          <img
+                          <Image
                             src={item.variant.images[0].url}
-                            alt={item.product?.name}
-                            className="w-full h-full object-contain p-4"
+                            alt={item.product?.name || 'Product'}
+                            fill
+                            sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                            className="object-contain p-4"
+                            loading="lazy"
                           />
                         ) : (
                           <div className="text-gray-400 text-center">

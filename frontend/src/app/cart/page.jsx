@@ -4,93 +4,74 @@ import { useState, useEffect } from 'react';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Header from '@/app/components/Header';
 import Footer from '@/app/components/Footer';
-import { cartApi, storageApi } from '@/lib/api';
+import { cartApi } from '@/lib/api';
+import { useToast } from '@/components/ToastContext';
+import { CartLoadingSkeleton } from '@/components/LoadingSkeleton';
 
 export default function CartPage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Fetch cart data
+  // Fetch cart data (works for both guest and authenticated users)
   useEffect(() => {
     const loadCart = async () => {
       try {
         setLoading(true);
-        setError(null);
+        const response = await cartApi.getCart();
+        setCartItems(response.items || []);
 
-        // Check if user is logged in
-        const isLoggedin = localStorage.getItem('isLoggedIn') === 'true';
-        if (isLoggedin) {
-          setIsLoggedIn(true);
-          // Fetch from API
-          const response = await cartApi.getCart();
-          setCartItems(response.items || []);
-        } else {
-          setIsLoggedIn(false);
-          // Load from localStorage
-          const storedCart = storageApi.getCart();
-          setCartItems(storedCart);
+        // Show toast if API returns one
+        if (response.toast) {
+          showToast(response.toast.message, response.toast.type);
         }
       } catch (err) {
         console.error('Error loading cart:', err);
-        setError('Failed to load cart. Please try again.');
-        // Fallback to localStorage
-        const storedCart = storageApi.getCart();
-        setCartItems(storedCart);
+        showToast('Failed to load cart. Please try again.', 'error');
+        setCartItems([]);
       } finally {
         setLoading(false);
       }
     };
 
     loadCart();
-  }, []);
+  }, [showToast]);
 
   // Update quantity
   const handleUpdateQuantity = async (itemId, newQuantity) => {
     if (newQuantity < 1) return;
 
     try {
-      if (isLoggedIn) {
-        // Update in database
-        await cartApi.updateCartItem(itemId, newQuantity);
-        setCartItems(prev =>
-          prev.map(item =>
-            item.id === itemId ? { ...item, quantity: newQuantity } : item
-          )
-        );
-      } else {
-        // Update in localStorage
-        storageApi.updateCartItem(itemId, newQuantity);
-        setCartItems(prev =>
-          prev.map(item =>
-            item.id === itemId ? { ...item, quantity: newQuantity } : item
-          )
-        );
+      const response = await cartApi.updateCartItem(itemId, newQuantity);
+      setCartItems(prev =>
+        prev.map(item =>
+          item.id === itemId ? { ...item, quantity: newQuantity } : item
+        )
+      );
+
+      if (response.toast) {
+        showToast(response.toast.message, response.toast.type);
       }
     } catch (err) {
       console.error('Error updating quantity:', err);
-      setError('Failed to update quantity');
+      showToast('Failed to update quantity', 'error');
     }
   };
 
   // Remove item from cart
   const handleRemoveItem = async (itemId) => {
     try {
-      if (isLoggedIn) {
-        // Remove from database
-        await cartApi.removeFromCart(itemId);
-      } else {
-        // Remove from localStorage
-        storageApi.removeFromCart(itemId);
-      }
+      const response = await cartApi.removeFromCart(itemId);
       setCartItems(prev => prev.filter(item => item.id !== itemId));
+
+      showToast(response.toast?.message || 'Item removed from cart', 'success');
     } catch (err) {
       console.error('Error removing item:', err);
-      setError('Failed to remove item');
+      showToast('Failed to remove item', 'error');
     }
   };
 
@@ -105,27 +86,18 @@ export default function CartPage() {
 
   // Handle checkout
   const handleCheckout = () => {
-    if (!isLoggedIn) {
-      // Redirect to login
-      router.push('/login?redirect=/checkout');
+    if (cartItems.length === 0) {
+      showToast('Your cart is empty', 'warning');
       return;
     }
-    // Proceed to checkout
     router.push('/checkout');
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <div className="animate-spin mb-4">
-              <ShoppingBag size={40} className="text-gray-400" />
-            </div>
-            <p className="text-gray-500">Loading cart...</p>
-          </div>
-        </div>
+        <CartLoadingSkeleton />
         <Footer />
       </div>
     );
@@ -146,11 +118,6 @@ export default function CartPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
-          </div>
-        )}
 
         {cartItems.length === 0 ? (
           <div className="bg-white rounded-lg p-12 text-center">
@@ -179,12 +146,15 @@ export default function CartPage() {
                     <div key={item.id} className="p-6 flex gap-4">
                       {/* Product Image */}
                       <Link href={`/product/${item.productId}`}>
-                        <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden shrink-0 cursor-pointer hover:shadow-md transition">
+                        <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden shrink-0 cursor-pointer hover:shadow-md transition relative">
                           {item.variant?.images?.[0]?.url ? (
-                            <img
+                            <Image
                               src={item.variant.images[0].url}
-                              alt={item.product?.name}
-                              className="w-full h-full object-contain p-2"
+                              alt={item.product?.name || 'Product'}
+                              fill
+                              sizes="96px"
+                              className="object-contain p-2"
+                              loading="lazy"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -308,14 +278,8 @@ export default function CartPage() {
                     onClick={handleCheckout}
                     className="w-full bg-[#172031] text-white py-3 rounded-lg font-bold hover:bg-[#232e42] transition mt-4"
                   >
-                    {isLoggedIn ? 'Proceed to Checkout' : 'Sign In to Checkout'}
+                    Proceed to Checkout
                   </button>
-
-                  {!isLoggedIn && (
-                    <p className="text-xs text-gray-500 text-center mt-2">
-                      You'll be redirected to sign in before checkout
-                    </p>
-                  )}
 
                   {/* Continue Shopping */}
                   <Link href="/products">

@@ -2,16 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Package, ArrowRight, Loader } from 'lucide-react';
+import { Package, ArrowRight } from 'lucide-react';
 import Header from '@/app/components/Header';
 import Footer from '@/app/components/Footer';
+import LoginPrompt from '@/components/LoginPrompt';
 import { orderApi } from '@/lib/api';
+import { useToast } from '@/components/ToastContext';
+import { OrdersLoadingSkeleton } from '@/components/LoadingSkeleton';
 
 export default function OrdersPage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [pagination, setPagination] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState(null);
@@ -24,11 +27,12 @@ export default function OrdersPage() {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        setError(null);
 
-        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-        if (!isLoggedIn) {
-          router.push('/login');
+        // Check if user is logged in
+        const token = localStorage.getItem('token');
+        if (!token) {
+          // Don't redirect, just stop loading to show login prompt
+          setLoading(false);
           return;
         }
 
@@ -39,10 +43,10 @@ export default function OrdersPage() {
           setOrders(response.data.orders);
           setPagination(response.data.pagination);
         } else {
-          setError('Failed to load orders');
+          showToast('Failed to load orders', 'error');
         }
       } catch (err) {
-        setError(err.message || 'Error loading orders');
+        showToast(err.message || 'Error loading orders', 'error');
         console.error('Error fetching orders:', err);
       } finally {
         setLoading(false);
@@ -50,7 +54,7 @@ export default function OrdersPage() {
     };
 
     fetchOrders();
-  }, [currentPage, statusFilter, router]);
+  }, [currentPage, statusFilter, router, showToast]);
 
   const handleStatusFilter = (status) => {
     setStatusFilter(statusFilter === status ? null : status);
@@ -87,6 +91,32 @@ export default function OrdersPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Header />
+        <OrdersLoadingSkeleton />
+        <Footer activeTab={activeTab} onTabChange={setActiveTab} />
+      </div>
+    );
+  }
+
+  // Check if user is logged in
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Header />
+        <LoginPrompt
+          title="View Your Orders"
+          message="Log in to track your orders, view order history, and manage returns"
+          showGuestOption={true}
+        />
+        <Footer activeTab={activeTab} onTabChange={setActiveTab} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header />
@@ -104,39 +134,15 @@ export default function OrdersPage() {
             <button
               key={status}
               onClick={() => handleStatusFilter(status)}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                statusFilter === status
-                  ? 'bg-[#172031] text-white shadow-md'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400'
-              }`}
+              className={`px-4 py-2 min-h-[44px] rounded-lg font-medium transition-all touch-manipulation active:scale-95 ${statusFilter === status
+                ? 'bg-[#172031] text-white shadow-md'
+                : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400'
+                }`}
             >
               {status}
             </button>
           ))}
         </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <Loader size={48} className="mx-auto mb-4 text-[#FF6B6B] animate-spin" />
-              <p className="text-gray-600">Loading your orders...</p>
-            </div>
-          </div>
-        )}
-
-        {/* Error State */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-700">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Retry
-            </button>
-          </div>
-        )}
 
         {/* Empty State */}
         {!loading && orders.length === 0 && (
@@ -146,7 +152,7 @@ export default function OrdersPage() {
             <p className="text-gray-600 mb-6">You haven't placed any orders yet. Start shopping to create your first order!</p>
             <button
               onClick={() => router.push('/products')}
-              className="px-6 py-2 bg-[#172031] text-white rounded-lg hover:bg-[#232e42] transition-colors"
+              className="px-6 py-3 min-h-[44px] bg-[#172031] text-white rounded-lg hover:bg-[#232e42] transition-colors touch-manipulation active:scale-95"
             >
               Start Shopping
             </button>
@@ -160,7 +166,7 @@ export default function OrdersPage() {
               <div
                 key={order.id}
                 onClick={() => router.push(`/orders/${order.id}`)}
-                className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+                className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer touch-manipulation active:scale-[0.99]"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   {/* Left Section */}
@@ -217,7 +223,7 @@ export default function OrdersPage() {
                         e.stopPropagation();
                         router.push(`/orders/${order.id}`);
                       }}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#172031] text-white rounded-lg hover:bg-[#232e42] transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-[#172031] text-white rounded-lg hover:bg-[#232e42] transition-colors touch-manipulation active:scale-95"
                     >
                       View Details
                       <ArrowRight size={18} />
@@ -235,7 +241,7 @@ export default function OrdersPage() {
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 min-h-[44px] border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation active:scale-95"
             >
               Previous
             </button>
@@ -244,11 +250,10 @@ export default function OrdersPage() {
               <button
                 key={page}
                 onClick={() => setCurrentPage(page)}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === page
-                    ? 'bg-[#172031] text-white'
-                    : 'border border-gray-300 hover:bg-gray-50'
-                }`}
+                className={`px-4 py-2 min-h-[44px] rounded-lg transition-colors touch-manipulation active:scale-95 ${currentPage === page
+                  ? 'bg-[#172031] text-white'
+                  : 'border border-gray-300 hover:bg-gray-50'
+                  }`}
               >
                 {page}
               </button>
@@ -257,7 +262,7 @@ export default function OrdersPage() {
             <button
               onClick={() => setCurrentPage(Math.min(pagination.pages, currentPage + 1))}
               disabled={currentPage === pagination.pages}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 min-h-[44px] border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation active:scale-95"
             >
               Next
             </button>

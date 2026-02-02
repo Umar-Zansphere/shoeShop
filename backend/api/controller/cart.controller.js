@@ -4,8 +4,9 @@ const cartService = require('../services/cart.services');
 
 const getCart = async (req, res, next) => {
   try {
-    const userId = req.user.id;
-    const cart = await cartService.getActiveCart(userId);
+    const userId = req.user?.id || null;
+    const sessionId = req.sessionId || null;
+    const cart = await cartService.getActiveCart(userId, sessionId);
     res.json(cart);
   } catch (error) {
     next(error);
@@ -14,8 +15,9 @@ const getCart = async (req, res, next) => {
 
 const getCartSummary = async (req, res, next) => {
   try {
-    const userId = req.user.id;
-    const summary = await cartService.getCartSummary(userId);
+    const userId = req.user?.id || null;
+    const sessionId = req.sessionId || null;
+    const summary = await cartService.getCartSummary(userId, sessionId);
     res.json(summary);
   } catch (error) {
     next(error);
@@ -24,7 +26,8 @@ const getCartSummary = async (req, res, next) => {
 
 const addToCart = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id || null;
+    const sessionId = req.sessionId || null;
     const { variantId, quantity } = req.body;
 
     if (!variantId) {
@@ -36,7 +39,7 @@ const addToCart = async (req, res, next) => {
       return res.status(400).json({ message: 'Quantity must be greater than 0' });
     }
 
-    const result = await cartService.addToCart(userId, variantId, qty);
+    const result = await cartService.addToCart(userId, sessionId, variantId, qty);
     res.status(201).json(result);
   } catch (error) {
     next(error);
@@ -45,7 +48,8 @@ const addToCart = async (req, res, next) => {
 
 const updateCartItem = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id || null;
+    const sessionId = req.sessionId || null;
     const { cartItemId } = req.params;
     const { quantity } = req.body;
 
@@ -57,7 +61,7 @@ const updateCartItem = async (req, res, next) => {
       return res.status(400).json({ message: 'Quantity is required' });
     }
 
-    const result = await cartService.updateCartItem(userId, cartItemId, parseInt(quantity));
+    const result = await cartService.updateCartItem(userId, sessionId, cartItemId, parseInt(quantity));
     res.json(result);
   } catch (error) {
     next(error);
@@ -66,14 +70,15 @@ const updateCartItem = async (req, res, next) => {
 
 const removeFromCart = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id || null;
+    const sessionId = req.sessionId || null;
     const { cartItemId } = req.params;
 
     if (!cartItemId) {
       return res.status(400).json({ message: 'Cart item ID is required' });
     }
 
-    const result = await cartService.removeFromCart(userId, cartItemId);
+    const result = await cartService.removeFromCart(userId, sessionId, cartItemId);
     res.json(result);
   } catch (error) {
     next(error);
@@ -82,8 +87,9 @@ const removeFromCart = async (req, res, next) => {
 
 const clearCart = async (req, res, next) => {
   try {
-    const userId = req.user.id;
-    const result = await cartService.clearCart(userId);
+    const userId = req.user?.id || null;
+    const sessionId = req.sessionId || null;
+    const result = await cartService.clearCart(userId, sessionId);
     res.json(result);
   } catch (error) {
     next(error);
@@ -94,8 +100,9 @@ const clearCart = async (req, res, next) => {
 
 const getWishlist = async (req, res, next) => {
   try {
-    const userId = req.user.id;
-    const wishlist = await cartService.getWishlist(userId);
+    const userId = req.user?.id || null;
+    const sessionId = req.sessionId || null;
+    const wishlist = await cartService.getWishlist(userId, sessionId);
     res.json(wishlist);
   } catch (error) {
     next(error);
@@ -104,14 +111,15 @@ const getWishlist = async (req, res, next) => {
 
 const addToWishlist = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id || null;
+    const sessionId = req.sessionId || null;
     const { productId, variantId } = req.body;
 
     if (!productId) {
       return res.status(400).json({ message: 'Product ID is required' });
     }
 
-    const result = await cartService.addToWishlist(userId, productId, variantId);
+    const result = await cartService.addToWishlist(userId, sessionId, productId, variantId);
     res.status(201).json(result);
   } catch (error) {
     next(error);
@@ -120,14 +128,15 @@ const addToWishlist = async (req, res, next) => {
 
 const removeFromWishlist = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id || null;
+    const sessionId = req.sessionId || null;
     const { wishlistItemId } = req.params;
 
     if (!wishlistItemId) {
       return res.status(400).json({ message: 'Wishlist item ID is required' });
     }
 
-    const result = await cartService.removeFromWishlist(userId, wishlistItemId);
+    const result = await cartService.removeFromWishlist(userId, sessionId, wishlistItemId);
     res.json(result);
   } catch (error) {
     next(error);
@@ -136,14 +145,15 @@ const removeFromWishlist = async (req, res, next) => {
 
 const moveToCart = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id || null;
+    const sessionId = req.sessionId || null;
     const { wishlistItemId } = req.params;
 
     if (!wishlistItemId) {
       return res.status(400).json({ message: 'Wishlist item ID is required' });
     }
 
-    const result = await cartService.moveToCart(userId, wishlistItemId);
+    const result = await cartService.moveToCart(userId, sessionId, wishlistItemId);
     res.json(result);
   } catch (error) {
     next(error);
@@ -152,8 +162,9 @@ const moveToCart = async (req, res, next) => {
 
 const clearWishlist = async (req, res, next) => {
   try {
-    const userId = req.user.id;
-    const result = await cartService.clearWishlist(userId);
+    const userId = req.user?.id || null;
+    const sessionId = req.sessionId || null;
+    const result = await cartService.clearWishlist(userId, sessionId);
     res.json(result);
   } catch (error) {
     next(error);

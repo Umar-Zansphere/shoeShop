@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/app/components/Header';
 import Footer from '@/app/components/Footer';
+import LoginPrompt from '@/components/LoginPrompt';
 import { userApi } from '@/lib/api';
 import {
   AlertCircle,
@@ -33,7 +34,8 @@ export default function EditProfilePage() {
         const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
 
         if (!isLoggedIn) {
-          router.push('/login?redirect=/profile/edit');
+          // Don't redirect, just stop loading to show login prompt
+          setLoading(false);
           return;
         }
 
@@ -134,19 +136,11 @@ export default function EditProfilePage() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
         <Header />
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="text-center">
-            <AlertCircle className="mx-auto mb-4 text-red-600" size={48} />
-            <h1 className="text-2xl font-bold mb-2">Profile Not Found</h1>
-            <p className="text-slate-600 mb-4">Please log in to edit your profile</p>
-            <button
-              onClick={() => router.push('/login')}
-              className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-medium transition"
-            >
-              Go to Login
-            </button>
-          </div>
-        </div>
+        <LoginPrompt
+          title="Edit Your Profile"
+          message="Log in to update your personal information and preferences"
+          showGuestOption={true}
+        />
         <Footer />
       </div>
     );

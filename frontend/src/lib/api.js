@@ -1,45 +1,50 @@
+import { getSessionId } from './sessionManager';
+
 const makeRequest = async (url, options = {}) => {
+  const sessionId = getSessionId();
+
   const response = await fetch(`${url}`, {
     headers: {
       'ngrok-skip-browser-warning': 'true',
       'Content-Type': 'application/json',
+      ...(sessionId ? { 'x-session-id': sessionId } : {}),
       ...options.headers,
     },
     ...options,
   });
-  
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: response.statusText }));
     throw new Error(error.message || `API error: ${response.status}`);
   }
-  
+
   return response.json();
 };
 
 export const authApi = {
   // Phone Auth
-  phoneLogin: (phoneNumber) => 
+  phoneLogin: (phoneNumber) =>
     fetch(`/api/auth/phone-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
       body: JSON.stringify({ phoneNumber }),
     }),
 
-  phoneLoginVerify: (phoneNumber, otp) => 
+  phoneLoginVerify: (phoneNumber, otp) =>
     fetch(`/api/auth/phone-login-verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       body: JSON.stringify({ phoneNumber, otp }),
     }),
 
-  phoneSignup: (phoneNumber) => 
+  phoneSignup: (phoneNumber) =>
     fetch(`/api/auth/phone-signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       body: JSON.stringify({ phoneNumber }),
     }),
 
-  phoneSignupVerify: (phoneNumber, otp) => 
+  phoneSignupVerify: (phoneNumber, otp) =>
     fetch(`/api/auth/phone-signup-verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
@@ -47,28 +52,28 @@ export const authApi = {
     }),
 
   // Email Auth
-  login: (email, password) => 
+  login: (email, password) =>
     fetch(`/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       body: JSON.stringify({ email, password }),
     }),
-    
-  signup: (email, password) => 
+
+  signup: (email, password) =>
     fetch(`/api/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       body: JSON.stringify({ email, password }),
     }),
 
-  verifyEmail: (token) => 
+  verifyEmail: (token) =>
     fetch(`/api/auth/verify-email`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       params: { token },
     }),
 
-  logout: () => 
+  logout: () =>
     fetch(`/api/auth/logout`, {
       method: 'POST',
       headers: { 'ngrok-skip-browser-warning': 'true' },
@@ -151,7 +156,7 @@ export const productApi = {
 // Cart API
 export const cartApi = {
   getCart: () => makeRequest('/api/cart'),
-  
+
   addToCart: (variantId, quantity = 1) =>
     makeRequest('/api/cart', {
       method: 'POST',
@@ -177,7 +182,7 @@ export const cartApi = {
 // Wishlist API
 export const wishlistApi = {
   getWishlist: () => makeRequest('/api/wishlist'),
-  
+
   addToWishlist: (productId, variantId = null) =>
     makeRequest('/api/wishlist', {
       method: 'POST',
@@ -211,7 +216,7 @@ export const storageApi = {
     if (typeof window === 'undefined') return;
     const cart = storageApi.getCart();
     const existingItem = cart.find(i => i.variantId === item.variantId);
-    
+
     if (existingItem) {
       existingItem.quantity += item.quantity;
     } else {
@@ -339,6 +344,15 @@ export const orderApi = {
       method: 'POST',
       credentials: 'include',
       body: JSON.stringify({ addressId, paymentMethod })
+    });
+  },
+
+  // Create guest order with address data
+  createGuestOrder: async (addressData, paymentMethod) => {
+    return makeRequest('/api/orders/guest', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify({ address: addressData, paymentMethod })
     });
   },
 

@@ -196,3 +196,109 @@ export const WishlistLoadingSkeleton = () => (
     </div>
   </div>
 );
+
+export const OrdersLoadingSkeleton = () => (
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-4">
+    {/* Header Skeleton */}
+    <div className="space-y-2 mb-8">
+      <div className="h-9 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded-lg w-48 animate-pulse"></div>
+      <div className="h-5 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 rounded w-64 animate-pulse"></div>
+    </div>
+
+    {/* Filter Buttons Skeleton */}
+    <div className="flex flex-wrap gap-2 mb-6">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="h-10 w-24 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded-lg animate-pulse"></div>
+      ))}
+    </div>
+
+    {/* Order Cards Skeleton */}
+    <div className="grid gap-4">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex-1 space-y-3">
+              <div className="h-6 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded w-48 animate-pulse"></div>
+              <div className="h-4 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 rounded w-64 animate-pulse"></div>
+
+              <div className="grid grid-cols-2 gap-4 my-4">
+                <div className="space-y-2">
+                  <div className="h-4 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 rounded w-16 animate-pulse"></div>
+                  <div className="h-5 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded w-12 animate-pulse"></div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 rounded w-16 animate-pulse"></div>
+                  <div className="h-5 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded w-24 animate-pulse"></div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <div className="h-7 w-20 bg-gradient-to-r from-yellow-100 via-yellow-50 to-yellow-100 rounded-full animate-pulse"></div>
+                <div className="h-7 w-32 bg-gradient-to-r from-blue-100 via-blue-50 to-blue-100 rounded-full animate-pulse"></div>
+              </div>
+            </div>
+
+            <div className="h-10 w-32 bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 rounded-lg animate-pulse"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+export const OrderDetailSkeleton = () => (
+  <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    {/* Header Skeleton */}
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded-lg animate-pulse"></div>
+      <div className="space-y-2">
+        <div className="h-8 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded w-48 animate-pulse"></div>
+        <div className="h-5 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 rounded w-32 animate-pulse"></div>
+      </div>
+    </div>
+
+    {/* Info Cards Skeleton */}
+    <div className="grid md:grid-cols-2 gap-6">
+      {[1, 2].map((i) => (
+        <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+          <div className="h-6 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded w-40 animate-pulse"></div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((j) => (
+              <div key={j} className="space-y-2">
+                <div className="h-4 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 rounded w-24 animate-pulse"></div>
+                <div className="h-5 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded w-full animate-pulse"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Items Section Skeleton */}
+    <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+      <div className="h-6 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded w-32 animate-pulse"></div>
+      <div className="space-y-4">
+        {[1, 2].map((i) => (
+          <div key={i} className="flex gap-4 pb-4 border-b border-gray-200 last:border-0">
+            <div className="w-20 h-20 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded-lg animate-pulse"></div>
+            <div className="flex-1 space-y-2">
+              <div className="h-5 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded w-3/4 animate-pulse"></div>
+              <div className="grid grid-cols-3 gap-4">
+                {[1, 2, 3].map((j) => (
+                  <div key={j} className="space-y-1">
+                    <div className="h-3 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 rounded w-12 animate-pulse"></div>
+                    <div className="h-4 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded w-16 animate-pulse"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2 text-right">
+              <div className="h-4 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 rounded w-16 ml-auto animate-pulse"></div>
+              <div className="h-5 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded w-20 ml-auto animate-pulse"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);

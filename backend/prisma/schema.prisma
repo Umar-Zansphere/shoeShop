@@ -103,6 +103,20 @@ model User {
   orders           Order[]
 }
 
+model GuestSession {
+  id        String   @id @default(uuid())
+  sessionId String   @unique @map("session_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  carts     Cart[]
+  wishlists Wishlist[]
+
+  @@index([sessionId])
+  @@index([expiresAt])
+}
+
 model OtpVerification {
   id         String    @id @default(uuid())
   userId     String?   @map("user_id")
@@ -129,8 +143,8 @@ model UserSession {
 
 model Address {
   id           String   @id @default(uuid())
-  userId       String   @map("user_id")
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String?  @map("user_id")
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   name         String // Home, Office
   phone        String   @db.VarChar(20)
   addressLine1 String   @map("address_line_1")
@@ -220,16 +234,20 @@ model InventoryLog {
 }
 
 model Cart {
-  id        String     @id @default(uuid())
-  userId    String     @map("user_id")
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    CartStatus @default(ACTIVE)
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
+  id        String        @id @default(uuid())
+  userId    String?       @map("user_id")
+  user      User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String?       @map("session_id")
+  session   GuestSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  status    CartStatus    @default(ACTIVE)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
 
   items CartItem[]
 
   @@unique([userId, status])
+  @@unique([sessionId, status])
+  @@index([sessionId])
 }
 
 model CartItem {
@@ -247,12 +265,18 @@ model CartItem {
 }
 
 model Wishlist {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now()) @map("created_at")
+  id        String        @id @default(uuid())
+  userId    String?       @map("user_id")
+  user      User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String?       @map("session_id")
+  session   GuestSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now()) @map("created_at")
 
   items WishlistItem[]
+
+  @@unique([userId])
+  @@unique([sessionId])
+  @@index([sessionId])
 }
 
 model WishlistItem {
@@ -269,8 +293,11 @@ model WishlistItem {
 
 model Order {
   id                String         @id @default(uuid())
-  userId            String         @map("user_id")
-  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String?        @map("user_id")
+  user              User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestPhone        String?        @map("guest_phone") @db.VarChar(20)
+  guestEmail        String?        @map("guest_email") @db.VarChar(255)
+  guestName         String?        @map("guest_name") @db.VarChar(255)
   orderNumber       String         @unique @map("order_number")
   status            OrderStatus    @default(PENDING)
   paymentStatus     PaymentStatus  @default(PENDING) @map("payment_status")
@@ -285,6 +312,10 @@ model Order {
   shipments     OrderShipment[]
   inventoryLogs InventoryLog[]
   orderAddress  OrderAddress?
+  tracking      OrderTracking?
+
+  @@index([guestPhone])
+  @@index([orderNumber])
 }
 
 model OrderItem {
@@ -342,4 +373,18 @@ model OrderShipment {
   status         OrderShipmentStatus @default(PENDING)
   shippedAt      DateTime?           @map("shipped_at")
   createdAt      DateTime            @default(now()) @map("created_at")
+}
+
+model OrderTracking {
+  id         String    @id @default(uuid())
+  orderId    String    @unique @map("order_id")
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  phone      String    @db.VarChar(20)
+  otpHash    String    @map("otp_hash")
+  expiresAt  DateTime  @map("expires_at")
+  verifiedAt DateTime? @map("verified_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([phone])
+  @@index([expiresAt])
 }

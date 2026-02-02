@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const cartController = require('../controller/cart.controller');
-const { verifyToken } = require('../middleware/auth.middleware');
+const { optionalAuth, extractSession } = require('../middleware/auth.middleware');
 
-// All cart routes require authentication
-router.use(verifyToken);
+// All cart routes support both authenticated users and guest sessions
+router.use(optionalAuth);
+router.use(extractSession);
 
 // ======================== CART ROUTES ========================
 
@@ -27,3 +28,4 @@ router.delete('/:cartItemId', cartController.removeFromCart);
 router.delete('/', cartController.clearCart);
 
 module.exports = router;
+

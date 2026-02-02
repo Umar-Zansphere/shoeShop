@@ -1,22 +1,26 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, MapPin, Truck, CreditCard, Package, AlertCircle, Loader, X } from 'lucide-react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
+import { ArrowLeft, MapPin, Truck, CreditCard, Package, X, CheckCircle } from 'lucide-react';
 import Header from '@/app/components/Header';
 import Footer from '@/app/components/Footer';
+import LoginPrompt from '@/components/LoginPrompt';
 import { orderApi } from '@/lib/api';
+import { useToast } from '@/components/ToastContext';
+import { OrderDetailSkeleton } from '@/components/LoadingSkeleton';
 
 export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
+  const { showToast } = useToast();
   const orderId = params.id;
 
   const [order, setOrder] = useState(null);
   const [tracking, setTracking] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -24,23 +28,23 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     // Check for payment success in URL
-    const searchParams = new URLSearchParams(window.location.search);
     if (searchParams.get('payment') === 'success') {
-      setPaymentSuccess(true);
+      showToast('Payment successful! Your order has been confirmed.', 'success');
       // Remove query param from URL
       window.history.replaceState({}, document.title, `/orders/${orderId}`);
     }
-  }, [orderId]);
+  }, [orderId, searchParams, showToast]);
 
   useEffect(() => {
     const fetchOrderData = async () => {
       try {
         setLoading(true);
-        setError(null);
 
-        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-        if (!isLoggedIn) {
-          router.push('/login');
+        // Check if user is logged in
+        const token = localStorage.getItem('token');
+        if (!token) {
+          // Don't redirect, just stop loading to show login prompt
+          setLoading(false);
           return;
         }
 
@@ -49,7 +53,7 @@ export default function OrderDetailPage() {
         if (orderResponse.success) {
           setOrder(orderResponse.data);
         } else {
-          setError('Failed to load order details');
+          showToast('Failed to load order details', 'error');
         }
 
         // Fetch tracking info if order is shipped
@@ -62,7 +66,7 @@ export default function OrderDetailPage() {
           // Tracking might not be available for all orders
         }
       } catch (err) {
-        setError(err.message || 'Error loading order');
+        showToast(err.message || 'Error loading order', 'error');
         console.error('Error fetching order:', err);
       } finally {
         setLoading(false);
@@ -72,14 +76,14 @@ export default function OrderDetailPage() {
     if (orderId) {
       fetchOrderData();
     }
-  }, [orderId, router]);
+  }, [orderId, router, showToast]);
 
   const handleCancelOrder = async () => {
     if (!order) return;
 
     // Check if order can be cancelled
     if (order.status === 'SHIPPED' || order.status === 'DELIVERED' || order.status === 'CANCELLED') {
-      setError(`Cannot cancel a ${order.status.toLowerCase()} order.`);
+      showToast(`Cannot cancel a ${order.status.toLowerCase()} order.`, 'warning');
       return;
     }
 
@@ -91,13 +95,14 @@ export default function OrderDetailPage() {
         setOrder((prev) => ({ ...prev, status: 'CANCELLED' }));
         setShowCancelModal(false);
         setCancelReason('');
+        showToast('Order cancelled successfully', 'success');
         // Optionally refresh page
         setTimeout(() => window.location.reload(), 1500);
       } else {
-        setError('Failed to cancel order');
+        showToast('Failed to cancel order', 'error');
       }
     } catch (err) {
-      setError(err.message || 'Error canceling order');
+      showToast(err.message || 'Error canceling order', 'error');
     } finally {
       setCanceling(false);
     }
@@ -126,28 +131,23 @@ export default function OrderDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <Header />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <Loader size={48} className="mx-auto mb-4 text-[#FF6B6B] animate-spin" />
-            <p className="text-gray-600">Loading order details...</p>
-          </div>
-        </div>
+        <OrderDetailSkeleton />
         <Footer activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
     );
   }
 
-  if (error && !order) {
+  if (!order) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <Header />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <AlertCircle size={48} className="mx-auto mb-4 text-red-500" />
-            <p className="text-gray-900 text-lg font-semibold mb-4">{error}</p>
+            <Package size={48} className="mx-auto mb-4 text-red-500" />
+            <p className="text-gray-900 text-lg font-semibold mb-4">Order not found</p>
             <button
               onClick={() => router.back()}
-              className="px-6 py-2 bg-[#172031] text-white rounded-lg hover:bg-[#232e42] transition-colors"
+              className="px-6 py-3 min-h-[44px] bg-[#172031] text-white rounded-lg hover:bg-[#232e42] transition-colors touch-manipulation active:scale-95"
             >
               Go Back
             </button>
@@ -167,7 +167,7 @@ export default function OrderDetailPage() {
         <div className="flex items-center gap-3 mb-8">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-2 min-w-[44px] min-h-[44px] hover:bg-gray-200 rounded-lg transition-colors touch-manipulation active:scale-95"
           >
             <ArrowLeft size={24} className="text-gray-700" />
           </button>
@@ -176,21 +176,6 @@ export default function OrderDetailPage() {
             <p className="text-gray-600">#{order?.orderNumber}</p>
           </div>
         </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
-
-        {paymentSuccess && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-3">
-              <CheckCircle size={20} className="text-green-600" />
-              <p className="text-green-700 font-semibold">Payment successful! Your order has been confirmed.</p>
-            </div>
-          </div>
-        )}
 
         {/* Status Section */}
         {order && (
@@ -247,13 +232,12 @@ export default function OrderDetailPage() {
 
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Payment Status</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                    order.paymentStatus === 'SUCCESS'
-                      ? 'bg-green-100 text-green-800'
-                      : order.paymentStatus === 'PENDING'
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${order.paymentStatus === 'SUCCESS'
+                    ? 'bg-green-100 text-green-800'
+                    : order.paymentStatus === 'PENDING'
                       ? 'bg-yellow-100 text-yellow-800'
                       : 'bg-red-100 text-red-800'
-                  }`}>
+                    }`}>
                     {order.paymentStatus}
                   </span>
                 </div>
@@ -300,11 +284,16 @@ export default function OrderDetailPage() {
               {order.items.map((item, index) => (
                 <div key={index} className="flex gap-4 pb-4 border-b border-gray-200 last:border-0">
                   {item.productImage && (
-                    <img
-                      src={item.productImage}
-                      alt={item.productName}
-                      className="w-20 h-20 object-contain rounded-lg bg-gray-50"
-                    />
+                    <div className="relative w-20 h-20 bg-gray-50 rounded-lg flex-shrink-0">
+                      <Image
+                        src={item.productImage}
+                        alt={item.productName}
+                        fill
+                        sizes="80px"
+                        className="object-contain rounded-lg"
+                        loading="lazy"
+                      />
+                    </div>
                   )}
 
                   <div className="flex-1">
@@ -343,7 +332,7 @@ export default function OrderDetailPage() {
             {canCancelOrder && (
               <button
                 onClick={() => setShowCancelModal(true)}
-                className="px-6 py-2 border-2 border-red-500 text-red-500 rounded-lg hover:bg-red-50 font-medium transition-colors"
+                className="px-6 py-3 min-h-[44px] border-2 border-red-500 text-red-500 rounded-lg hover:bg-red-50 font-medium transition-colors touch-manipulation active:scale-95"
               >
                 Cancel Order
               </button>
@@ -351,7 +340,7 @@ export default function OrderDetailPage() {
 
             <button
               onClick={() => router.push('/products')}
-              className="px-6 py-2 bg-[#172031] text-white rounded-lg hover:bg-[#232e42] font-medium transition-colors"
+              className="px-6 py-3 min-h-[44px] bg-[#172031] text-white rounded-lg hover:bg-[#232e42] font-medium transition-colors touch-manipulation active:scale-95"
             >
               Continue Shopping
             </button>
@@ -367,7 +356,7 @@ export default function OrderDetailPage() {
               <h2 className="text-2xl font-bold text-gray-900">Cancel Order</h2>
               <button
                 onClick={() => setShowCancelModal(false)}
-                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1 min-w-[44px] min-h-[44px] hover:bg-gray-100 rounded-lg transition-colors touch-manipulation active:scale-95"
               >
                 <X size={24} />
               </button>
@@ -389,18 +378,18 @@ export default function OrderDetailPage() {
               <button
                 onClick={() => setShowCancelModal(false)}
                 disabled={canceling}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-3 min-h-[44px] border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 touch-manipulation active:scale-95"
               >
                 Keep Order
               </button>
               <button
                 onClick={handleCancelOrder}
                 disabled={canceling}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-3 min-h-[44px] bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 touch-manipulation active:scale-95"
               >
                 {canceling ? (
                   <>
-                    <Loader size={18} className="animate-spin" />
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     Cancelling...
                   </>
                 ) : (
