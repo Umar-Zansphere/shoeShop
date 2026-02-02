@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Smartphone, Mail, Lock, ArrowRight } from 'lucide-react';
-import Input from '../../components/ui/Input';
-import Button from '../../components/ui/Button';
+import Input from '@/components/admin/FormInput';
+import Button from '@/components/admin/Button';
 import { authApi } from '@/lib/api';
 import { useMigrateStorageData } from '@/hooks/useMigrateStorageData';
 import PublicRoute from '@/components/PublicRoute';

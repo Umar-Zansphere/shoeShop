@@ -166,7 +166,7 @@ model Product {
 model ProductImage {
   id        String         @id @default(uuid())
   variantId String
-  variant   ProductVariant @relation(fields: [variantId], references: [id])
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   url       String
   altText   String         @map("alt_text")
   position  Int

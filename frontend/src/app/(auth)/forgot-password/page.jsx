@@ -40,6 +40,7 @@ function ForgotPasswordContent() {
       <div className="pt-6 px-6">
         <button 
           onClick={() => router.back()}
+          aria-label="Go back"
           className="p-3 -ml-3 hover:bg-gray-100 rounded-full transition-colors duration-300"
         >
           <ChevronLeft size={24} className="text-(--text-primary)" />

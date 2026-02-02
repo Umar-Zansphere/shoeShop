@@ -77,7 +77,7 @@ function VerifyEmailContent() {
           <div className="pt-2">
             {status === 'verifying' && (
                <div className="flex justify-center text-(--accent)">
-                 <Loader2 className="animate-spin h-8 w-8" />
+                 <Loader2 className="animate-spin h-8 w-8" data-testid="loader-spin" />
                </div>
             )}
 

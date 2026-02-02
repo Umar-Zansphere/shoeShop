@@ -38,8 +38,8 @@ export default function OrderDetailPage() {
         setLoading(true);
         setError(null);
 
-        const token = localStorage.getItem('authToken');
-        if (!token) {
+        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+        if (!isLoggedIn) {
           router.push('/login');
           return;
         }

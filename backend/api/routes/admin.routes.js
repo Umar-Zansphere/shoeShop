@@ -30,8 +30,9 @@ router.use(verifyAdmin);
 // Get all products (with filtering)
 router.get('/products', productController.getProducts);
 
-// Create new product
-router.post('/products', productController.createProduct);
+// Create new product with multipart form data (variants with images)
+// Use .any() to capture all file fields with dynamic names (images_0, images_1, etc.)
+router.post('/products', uploadInMemory.any(), handleMultipartError, productController.createProduct);
 
 // Get product by ID
 router.get('/products/:productId', productController.getProductById);

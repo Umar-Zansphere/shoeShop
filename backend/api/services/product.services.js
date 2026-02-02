@@ -233,11 +233,28 @@ const updateProduct = async (productId, updateData) => {
 };
 
 const deleteProduct = async (productId) => {
-  const product = await prisma.product.findUnique({ where: { id: productId } });
+  const product = await prisma.product.findUnique({ 
+    where: { id: productId },
+    include: { 
+      variants: {
+        include: { images: true }
+      }
+    }
+  });
   if (!product) {
     throw new Error('Product not found');
   }
 
+  // Delete all images for all variants
+  for (const variant of product.variants) {
+    if (variant.images.length > 0) {
+      await prisma.productImage.deleteMany({
+        where: { variantId: variant.id }
+      });
+    }
+  }
+
+  // Delete the product (variants will cascade delete due to onDelete: Cascade)
   await prisma.product.delete({ where: { id: productId } });
 
   return { message: 'Product deleted successfully' };
@@ -512,11 +529,22 @@ const updateProductVariant = async (variantId, updateData) => {
 };
 
 const deleteProductVariant = async (variantId) => {
-  const variant = await prisma.productVariant.findUnique({ where: { id: variantId } });
+  const variant = await prisma.productVariant.findUnique({ 
+    where: { id: variantId },
+    include: { images: true }
+  });
   if (!variant) {
     throw new Error('Variant not found');
   }
 
+  // Delete all images for this variant first
+  if (variant.images.length > 0) {
+    await prisma.productImage.deleteMany({
+      where: { variantId: variantId }
+    });
+  }
+
+  // Delete the variant
   await prisma.productVariant.delete({ where: { id: variantId } });
 
   return { message: 'Product variant deleted successfully' };
