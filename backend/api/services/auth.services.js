@@ -17,26 +17,26 @@ const generateTokens = (user) => {
 };
 
 const createSession = async (userId, accessToken, req) => {
-    const rawUA = req.headers['user-agent'] || 'Unknown UA';
-    const parsedUA = useragent.parse(rawUA);
+  const rawUA = req.headers['user-agent'] || 'Unknown UA';
+  const parsedUA = useragent.parse(rawUA);
 
-    // Force to string
-    const uaString = `${parsedUA.browser} ${parsedUA.version} / ${parsedUA.os} ${parsedUA.platform}`;
+  // Force to string
+  const uaString = `${parsedUA.browser} ${parsedUA.version} / ${parsedUA.os} ${parsedUA.platform}`;
 
-    // Calculate expiration based on JWT_REFRESH_EXPIRES_IN
-    const expiresAt = new Date(
-        Date.now() + parseInt(process.env.JWT_REFRESH_EXPIRES_IN) * 1000
-    );
+  // Calculate expiration based on JWT_REFRESH_EXPIRES_IN
+  const expiresAt = new Date(
+    Date.now() + parseInt(process.env.JWT_REFRESH_EXPIRES_IN) * 1000
+  );
 
-    return prisma.userSession.create({
-        data: {
-            userId: userId,
-            refreshTokenHash: accessToken, // This is the allowlist entry
-            deviceInfo: uaString, // 🔥 always a string
-            ipAddress: req.ip || req.connection?.remoteAddress || null,
-            expiresAt: expiresAt,
-        }
-    }); 
+  return prisma.userSession.create({
+    data: {
+      userId: userId,
+      refreshTokenHash: accessToken, // This is the allowlist entry
+      deviceInfo: uaString, // 🔥 always a string
+      ipAddress: req.ip || req.connection?.remoteAddress || null,
+      expiresAt: expiresAt,
+    }
+  });
 };
 
 const signup = async (email, password) => {
@@ -55,24 +55,24 @@ const signup = async (email, password) => {
   });
 
   // send verification email
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${newUser.emailVerificationToken}`;
-    await sendEmail(
-      newUser.email,
-      'Verify Your SoleMate Account',
-      'verify-email',
-      { user: newUser, verificationUrl }
-    );
+  const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${newUser.emailVerificationToken}`;
+  await sendEmail(
+    newUser.email,
+    'Verify Your SoleMate Account',
+    'verify-email',
+    { user: newUser, verificationUrl }
+  );
 
-    return {
-      newUser,
-      message: 'Signup successful! Please check your email to verify your account.'
+  return {
+    newUser,
+    message: 'Signup successful! Please check your email to verify your account.'
   };
 };
 
 const login = async (email, password, req) => {
   const user = await prisma.user.findUnique({ where: { email } });
 
-  if(!user) {
+  if (!user) {
     throw new Error('Invalid email or password');
   }
 
@@ -83,14 +83,14 @@ const login = async (email, password, req) => {
   if (user.is_email_verified === null) {
     throw new Error('Please verify your email.');
   }
-  const {accessToken} = generateTokens(user);
-    // Update last login time
-    const updatedUser = await prisma.user.update({
-        where: { id: user.id },
-        data: { last_login_at: new Date() },
-    });
+  const { accessToken } = generateTokens(user);
+  // Update last login time
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: { last_login_at: new Date() },
+  });
 
-  return{accessToken, user: updatedUser };
+  return { accessToken, user: updatedUser };
 }
 
 const verifyEmail = async (token) => {
@@ -104,11 +104,11 @@ const verifyEmail = async (token) => {
   const updatedUser = await prisma.user.update({
     where: { id: user.id },
     data: {
-       emailVerificationToken: null,
-       is_email_verified: new Date(),
+      emailVerificationToken: null,
+      is_email_verified: new Date(),
     },
   });
-  
+
   return { message: 'Email verified successfully.' };
 };
 
@@ -121,7 +121,7 @@ const forgotPassword = async (email) => {
     .createHash('sha256')
     .update(resetToken)
     .digest('hex');
-  
+
   const passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
   await prisma.user.update({
@@ -188,20 +188,20 @@ const changePassword = async (userId, oldPassword, newPassword, req) => {
 
 const logout = async (userId, accessToken) => {
   if (!accessToken) {
-        return { message: 'No session to revoke.' };
-    }
-    console.log("Revoking session for user ID:", userId);
-    console.log("With access token:", accessToken);
+    return { message: 'No session to revoke.' };
+  }
+  console.log("Revoking session for user ID:", userId);
+  console.log("With access token:", accessToken);
 
   const session = await prisma.userSession.findUnique({
-        where: { refreshTokenHash: accessToken }
-    });
-    if (session) {
-        await prisma.userSession.delete({ where: { id: session.id } });
-        console.log(`Session ${session.id} revoked for user ${session.userId}`);
-    } else {
-        console.log("Logout attempted for a token that was already invalid or expired.");
-    }
+    where: { refreshTokenHash: accessToken }
+  });
+  if (session) {
+    await prisma.userSession.delete({ where: { id: session.id } });
+    console.log(`Session ${session.id} revoked for user ${session.userId}`);
+  } else {
+    console.log("Logout attempted for a token that was already invalid or expired.");
+  }
   return { message: 'Logged out successfully.' };
 };
 
@@ -264,10 +264,10 @@ const sendPhoneVerification = async (userId, phoneNumber) => {
       },
     });
 
-      const message = `Your SoleMate verification code is: ${otp}. This code expires in 10 minutes.`;
-      console.log(`[SMS OTP] Message ready for ${phoneNumber}: ${message}`);
-      // TODO: Integrate SMS service (Twilio, AWS SNS, etc.)
-      // await smsService.sendOTP(phoneNumber, otp);
+    const message = `Your SoleMate verification code is: ${otp}. This code expires in 10 minutes.`;
+    console.log(`[SMS OTP] Message ready for ${phoneNumber}: ${message}`);
+    // TODO: Integrate SMS service (Twilio, AWS SNS, etc.)
+    // await smsService.sendOTP(phoneNumber, otp);
 
     return {
       success: true,
@@ -405,7 +405,7 @@ const phoneSignupVerify = async (phoneNumber, otp) => {
   try {
     // Validate OTP format
     if (!/^\d{6}$/.test(otp)) {
-      throw new Error('Invalid verification code format.'); 
+      throw new Error('Invalid verification code format.');
     }
 
     const otpHash = hashOTP(otp);
@@ -471,7 +471,7 @@ const phoneSignupVerify = async (phoneNumber, otp) => {
     // Mark OTP as verified AND link it to the User ID
     await prisma.otpVerification.update({
       where: { id: otpVerification.id },
-      data: { 
+      data: {
         verifiedAt: now,
         userId: user.id // Link the OTP record to the created/found user
       },
