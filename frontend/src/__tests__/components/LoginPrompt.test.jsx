@@ -39,9 +39,7 @@ describe('LoginPrompt Component', () => {
             push: mockPush,
         })
 
-        // Mock window.location.pathname
-        delete window.location
-        window.location = { pathname: '/profile' }
+        history.pushState({}, '', '/profile')
 
         renderWithProviders(<LoginPrompt />)
 

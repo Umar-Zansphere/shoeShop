@@ -38,7 +38,7 @@ describe('ProductCard Component', () => {
     it('renders product image', () => {
         renderWithProviders(<ProductCard product={mockProduct} />)
 
-        const image = screen.getByAlt('Nike Air Max')
+        const image = screen.getByAltText('Nike Air Max')
         expect(image).toBeInTheDocument()
         expect(image).toHaveAttribute('src', expect.stringContaining('test-image.jpg'))
     })

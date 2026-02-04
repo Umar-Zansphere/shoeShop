@@ -1,7 +1,7 @@
 "use client";
 
 export const LoadingSkeleton = () => (
-  <div className="p-4 sm:p-5 md:p-6 lg:p-8 space-y-4 sm:space-y-5 md:space-y-6">
+  <div data-testid="loading-skeleton" className="p-4 sm:p-5 md:p-6 lg:p-8 space-y-4 sm:space-y-5 md:space-y-6">
     {/* Header Skeleton */}
     <div className="space-y-2">
       <div className="h-7 sm:h-8 md:h-9 bg-linear-to-r from-slate-200 via-slate-100 to-slate-200 rounded-lg w-3/4 sm:w-2/3 animate-pulse"></div>

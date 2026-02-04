@@ -1,22 +1,12 @@
 import { screen } from '@testing-library/react'
-import { renderWithProviders } from '../utils/test-utils'
+import { renderWithProviders, mockApi } from '../utils/test-utils'
 import TrackOrderPage from '@/app/track-order/page'
 
-jest.mock('@/lib/api', () => ({
-    orderApi: {
-        trackOrder: jest.fn(() => Promise.resolve({
-            success: true,
-            data: {
-                orderNumber: 'ORD-001',
-                status: 'SHIPPED',
-                trackingEvents: [],
-            },
-        })),
-    },
-}))
+jest.mock('@/lib/api', () => mockApi)
 
 jest.mock('@/components/ToastContext', () => ({
     useToast: () => ({ showToast: jest.fn() }),
+    ToastProvider: ({ children }) => <>{children}</>,
 }))
 
 describe('Track Order Page', () => {
@@ -26,7 +16,7 @@ describe('Track Order Page', () => {
 
     it('renders track order page', () => {
         renderWithProviders(<TrackOrderPage />)
-        expect(screen.queryByText(/track/i) || document.body).toBeTruthy()
+                expect(screen.getByRole('heading', { name: /track your order/i })).toBeInTheDocument()
     })
 
     it('displays order tracking form', () => {

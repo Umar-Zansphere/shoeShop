@@ -127,4 +127,7 @@ export const mockApi = {
         addToWishlist: jest.fn(() => Promise.resolve({ success: true })),
         removeFromWishlist: jest.fn(() => Promise.resolve({ success: true })),
     },
+    storageApi: {
+        getCart: jest.fn(() => []),
+    },
 }

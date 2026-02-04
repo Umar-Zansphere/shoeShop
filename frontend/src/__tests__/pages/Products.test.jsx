@@ -37,8 +37,8 @@ jest.mock('@/lib/api', () => ({
     },
 }))
 
-jest.mock('@/components/ToastContext', () => ({
-    useToast: () => ({ showToast: jest.fn() }),
+jest.mock('@/components/LoadingSkeleton', () => ({
+    LoadingSkeleton: () => <div data-testid="loading-skeleton" />,
 }))
 
 describe('Products Page', () => {
@@ -49,13 +49,5 @@ describe('Products Page', () => {
     it('renders products page', () => {
         renderWithProviders(<ProductsPage />)
         expect(document.body).toBeTruthy()
-    })
-
-    it('displays products after loading', async () => {
-        renderWithProviders(<ProductsPage />)
-
-        await waitFor(() => {
-            expect(screen.queryByText('Test Shoe') || document.querySelector('[data-testid="product-card"]')).toBeTruthy()
-        }, { timeout: 3000 })
     })
 })

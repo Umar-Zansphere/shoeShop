@@ -2,30 +2,11 @@ import { screen, fireEvent, waitFor } from '@testing-library/react'
 import { renderWithProviders, mockApi } from '../utils/test-utils'
 import CartPage from '@/app/cart/page'
 
-jest.mock('@/lib/api', () => ({
-    cartApi: {
-        getCart: jest.fn(() => Promise.resolve({
-            success: true,
-            data: [
-                {
-                    id: 1,
-                    variantId: 1,
-                    quantity: 2,
-                    product: { name: 'Test Shoe', brand: 'Nike' },
-                    variant: { size: '10', color: 'Black', price: 99.99 },
-                },
-            ],
-        })),
-        updateCartItem: jest.fn(() => Promise.resolve({ success: true })),
-        removeFromCart: jest.fn(() => Promise.resolve({ success: true })),
-    },
-    storageApi: {
-        getCart: jest.fn(() => []),
-    },
-}))
+jest.mock('@/lib/api', () => mockApi)
 
 jest.mock('@/components/ToastContext', () => ({
     useToast: () => ({ showToast: jest.fn() }),
+    ToastProvider: ({ children }) => <>{children}</>,
 }))
 
 describe('Cart Page', () => {
@@ -36,7 +17,7 @@ describe('Cart Page', () => {
 
     it('renders cart page', () => {
         renderWithProviders(<CartPage />)
-        expect(screen.getByText(/cart/i) || document.body).toBeTruthy()
+                expect(screen.getByRole('heading', { name: /shopping cart/i })).toBeInTheDocument()
     })
 
     it('displays empty cart message when cart is empty', async () => {

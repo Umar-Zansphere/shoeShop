@@ -1,13 +1,9 @@
 import { screen, fireEvent, waitFor } from '@testing-library/react'
-import { renderWithProviders } from '../utils/test-utils'
+import { renderWithProviders, mockApi } from '../utils/test-utils'
 import Header from '@/app/components/Header'
 
 // Mock the API
-jest.mock('@/lib/api', () => ({
-    storageApi: {
-        getCart: jest.fn(() => []),
-    },
-}))
+jest.mock('@/lib/api', () => mockApi)
 
 describe('Header Component', () => {
     beforeEach(() => {
@@ -19,7 +15,8 @@ describe('Header Component', () => {
     it('renders the Header component', () => {
         renderWithProviders(<Header />)
 
-        expect(screen.getByText(/SoleMate/i)).toBeInTheDocument()
+        const soleMateElements = screen.getAllByText(/SoleMate/i)
+        expect(soleMateElements.length).toBeGreaterThan(0)
         expect(screen.getByLabelText(/open menu/i)).toBeInTheDocument()
         expect(screen.getByLabelText(/shopping cart/i)).toBeInTheDocument()
     })
@@ -53,16 +50,20 @@ describe('Header Component', () => {
             { id: 2, quantity: 3 },
         ]
 
-        renderWithProviders(<Header cart={mockCart} />)
+        require('@/lib/api').storageApi.getCart.mockReturnValue(mockCart)
+        renderWithProviders(<Header />)
 
         // Cart count should be 5 (2 + 3)
         expect(screen.getByText('5')).toBeInTheDocument()
     })
 
     it('does not display cart count when cart is empty', () => {
-        renderWithProviders(<Header cart={[]} />)
+        require('@/lib/api').storageApi.getCart.mockReturnValue([])
+        renderWithProviders(<Header />)
 
-        expect(screen.queryByText(/\d+/)).not.toBeInTheDocument()
+                expect(screen.queryByText((content, element) => {
+            return element.tagName.toLowerCase() === 'span' && /\d+/.test(content);
+        })).not.toBeInTheDocument()
     })
 
     it('opens sidebar when hamburger menu is clicked', () => {
@@ -113,7 +114,8 @@ describe('Header Component', () => {
     it('displays 99+ for cart count over 99', () => {
         const mockCart = Array(50).fill({ id: 1, quantity: 3 })
 
-        renderWithProviders(<Header cart={mockCart} />)
+        require('@/lib/api').storageApi.getCart.mockReturnValue(mockCart)
+        renderWithProviders(<Header />)
 
         expect(screen.getByText('99+')).toBeInTheDocument()
     })

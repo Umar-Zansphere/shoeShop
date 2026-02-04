@@ -1,32 +1,12 @@
 import { screen, waitFor } from '@testing-library/react'
-import { renderWithProviders } from '../utils/test-utils'
+import { renderWithProviders, mockApi } from '../utils/test-utils'
 import ProfilePage from '@/app/profile/page'
 
-jest.mock('@/lib/api', () => ({
-    userApi: {
-        getProfile: jest.fn(() => Promise.resolve({
-            success: true,
-            data: {
-                id: 1,
-                fullName: 'Test User',
-                email: 'test@example.com',
-                phone: '1234567890',
-            },
-        })),
-    },
-    authApi: {
-        logout: jest.fn(() => Promise.resolve({ success: true })),
-    },
-    orderApi: {
-        getOrders: jest.fn(() => Promise.resolve({
-            success: true,
-            data: { orders: [], pagination: { total: 0 } },
-        })),
-    },
-}))
+jest.mock('@/lib/api', () => mockApi)
 
 jest.mock('@/components/ToastContext', () => ({
     useToast: () => ({ showToast: jest.fn() }),
+    ToastProvider: ({ children }) => <>{children}</>,
 }))
 
 describe('Profile Page', () => {
@@ -46,7 +26,7 @@ describe('Profile Page', () => {
         renderWithProviders(<ProfilePage />)
 
         await waitFor(() => {
-            expect(screen.queryByText(/login/i) || screen.queryByText(/profile not found/i)).toBeTruthy()
+                        expect(screen.getByRole('button', { name: /go to login/i })).toBeInTheDocument()
         })
     })
 

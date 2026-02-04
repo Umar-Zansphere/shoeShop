@@ -20,6 +20,7 @@ jest.mock('@/lib/api', () => ({
 
 jest.mock('@/components/ToastContext', () => ({
     useToast: () => ({ showToast: jest.fn() }),
+    ToastProvider: ({ children }) => <>{children}</>,
 }))
 
 describe('Wishlist Page', () => {
