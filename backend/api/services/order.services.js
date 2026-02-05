@@ -1,5 +1,7 @@
 const prisma = require('../../config/prisma');
 const razorpayService = require('./razorpay.services');
+const { sendEmail } = require('../../config/email');
+const {generateTokens} = require('../services/auth.services');
 
 // ======================== ORDER CRUD ========================
 
@@ -11,7 +13,7 @@ const getOrders = async (filters = {}) => {
   if (status) where.status = status;
   if (paymentStatus) where.paymentStatus = paymentStatus;
   if (userId) where.userId = userId;
-  
+
   if (search) {
     where.OR = [
       { orderNumber: { contains: search, mode: 'insensitive' } },
@@ -61,12 +63,38 @@ const getOrderById = async (orderId) => {
     where: { id: orderId },
     include: {
       user: { select: { id: true, email: true, fullName: true, phone: true } },
-      items: {  
-        include: { 
+      items: {
+        include: {
           variant: { include: { product: true } }
         }
       },
       payments: true,
+      shipments: true,
+      orderAddress: true,
+    }
+  });
+
+  if (!order) {
+    throw new Error('Order not found');
+  }
+
+  return order;
+};
+
+/**
+ * Get order by tracking token (public read-only access)
+ * @param {string} trackingToken - Unique tracking token
+ * @returns {Promise<Object>} Order details
+ */
+const getOrderByTrackingToken = async (trackingToken) => {
+  const order = await prisma.order.findUnique({
+    where: { trackingToken },
+    include: {
+      items: {
+        include: {
+          variant: { include: { product: true } }
+        }
+      },
       shipments: true,
       orderAddress: true,
     }
@@ -280,7 +308,7 @@ const cancelOrder = async (orderId, reason = '') => {
   // Update order status
   const updatedOrder = await prisma.order.update({
     where: { id: orderId },
-    data: { 
+    data: {
       status: 'CANCELLED',
       paymentStatus: 'FAILED' // Mark payment as failed on cancellation
     },
@@ -440,6 +468,11 @@ const createOrderFromCart = async (userId, orderData) => {
     return newOrder;
   });
 
+  // Get order address for email
+  const orderAddress = await prisma.orderAddress.findFirst({
+    where: { orderId: order.id }
+  });
+
   // If Razorpay, create Razorpay order
   let razorpayOrderDetails = null;
   if (paymentMethod === 'RAZORPAY') {
@@ -463,6 +496,43 @@ const createOrderFromCart = async (userId, orderData) => {
     }
   }
 
+  // Send order confirmation email
+  try {
+    await sendEmail(
+      user.email,
+      'Order Confirmation - ' + order.orderNumber,
+      'order-confirmation',
+      {
+        customerName: user.fullName,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        paymentMethod,
+        totalAmount: order.totalAmount,
+        createdAt: order.createdAt,
+        items: order.items.map(item => ({
+          productName: item.productName,
+          color: item.color,
+          size: item.size,
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.subtotal
+        })),
+        addressLine1: orderAddress?.addressLine1 || '',
+        addressLine2: orderAddress?.addressLine2 || '',
+        city: orderAddress?.city || '',
+        state: orderAddress?.state || '',
+        postalCode: orderAddress?.postalCode || '',
+        country: orderAddress?.country || '',
+        phone: orderAddress?.phone || user.phone || '',
+        trackingUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/orders/${order.id}`
+      }
+    );
+  } catch (emailError) {
+    console.error('Error sending order confirmation email:', emailError);
+    // Don't throw error - order creation should succeed even if email fails
+  }
+
   return {
     orderId: order.id,
     orderNumber: order.orderNumber,
@@ -476,11 +546,247 @@ const createOrderFromCart = async (userId, orderData) => {
       razorpayOrderId: razorpayOrderDetails.razorpayOrderId,
       razorpayAmount: razorpayOrderDetails.amount,
       razorpayCurrency: razorpayOrderDetails.currency,
+    }),
+    // For COD, indicate payment to be collected on delivery
+    ...(paymentMethod === 'COD' && {
+      message: 'Order created successfully. Payment to be collected on delivery.'
     })
   };
 };
 
-const getCustomerOrders = async (userId, filters = {}) => {
+/**
+ * Create order from cart for guest users
+ * Flow: Create guest user → Create address → Create order
+ */
+const createOrderFromCartAsGuest = async (sessionId, orderData) => {
+  const crypto = require('crypto');
+  const { address, paymentMethod } = orderData;
+
+  // Validate required fields
+  if (!address || !paymentMethod) {
+    throw new Error('Address and payment method are required');
+  }
+
+  if (!address.email || !address.phone) {
+    throw new Error('Email and phone are required in address');
+  }
+
+  // Get guest session
+  const session = await prisma.guestSession.findUnique({
+    where: { sessionId }
+  });
+
+  if (!session) {
+    throw new Error('Invalid session ID');
+  }
+
+  // Get guest's cart
+  const cart = await prisma.cart.findFirst({
+    where: { sessionId: session.id, status: 'ACTIVE' },
+    include: { items: { include: { variant: { include: { product: true } } } } }
+  });
+
+  if (!cart || cart.items.length === 0) {
+    throw new Error('Cart is empty');
+  }
+
+  // Create guest user and order in a transaction
+  const order = await prisma.$transaction(async (tx) => {
+    // 1. Create guest user with email and phone from address
+    const guestUser = await tx.user.create({
+      data: {
+        email: address.email,
+        phone: address.phone,
+        fullName: address.name,
+        isGuest: true,
+        is_active: false, // Guest users don't have passwords
+        role: 'CUSTOMER'
+      }
+    });
+
+    const { accessToken } = generateTokens(guestUser); // Optionally generate tokens for guest user session
+
+    // 2. Create address with the new user ID
+    await tx.address.create({
+      data: {
+        userId: guestUser.id,
+        name: address.name,
+        phone: address.phone,
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2 || null,
+        city: address.city,
+        state: address.state,
+        postalCode: address.postalCode,
+        country: address.country,
+        isDefault: true
+      }
+    });
+
+    // 3. Calculate total
+    const totalAmount = cart.items.reduce((sum, item) => sum + (parseFloat(item.unitPrice) * item.quantity), 0);
+
+    // 4. Generate order number and tracking token
+    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const trackingToken = crypto.randomBytes(16).toString('hex');
+
+    // 5. Create order
+    const newOrder = await tx.order.create({
+      data: {
+        userId: guestUser.id,
+        orderNumber,
+        trackingToken,
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        paymentMethod,
+        totalAmount: parseFloat(totalAmount),
+        items: {
+          create: cart.items.map(item => ({
+            variantId: item.variantId,
+            productName: item.variant.product.name,
+            color: item.variant.color,
+            size: item.variant.size,
+            price: item.unitPrice,
+            quantity: item.quantity,
+            subtotal: parseFloat(item.unitPrice) * item.quantity
+          }))
+        }
+      },
+      include: {
+        items: { include: { variant: { include: { product: true } } } },
+        payments: true,
+        shipments: true
+      }
+    });
+
+    // 6. Create order address
+    await tx.orderAddress.create({
+      data: {
+        orderId: newOrder.id,
+        name: address.name,
+        phone: address.phone,
+        email: address.email,
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2 || null,
+        city: address.city,
+        state: address.state,
+        postalCode: address.postalCode,
+        country: address.country
+      }
+    });
+
+    // 7. Create initial shipment
+    await tx.orderShipment.create({
+      data: {
+        orderId: newOrder.id,
+        status: 'PENDING'
+      }
+    });
+
+    // 8. Mark inventory as HOLD
+    for (const item of cart.items) {
+      await tx.inventoryLog.create({
+        data: {
+          variantId: item.variantId,
+          orderId: newOrder.id,
+          type: 'HOLD',
+          quantity: item.quantity,
+          note: 'Guest order created, awaiting payment'
+        }
+      });
+    }
+
+    return newOrder;
+  });
+
+  // Get order address for email
+  const orderAddress = await prisma.orderAddress.findFirst({
+    where: { orderId: order.id }
+  });
+
+  // If Razorpay, create Razorpay order
+  let razorpayOrderDetails = null;
+  if (paymentMethod === 'RAZORPAY') {
+    try {
+      razorpayOrderDetails = await razorpayService.createRazorpayOrder({
+        orderId: order.id,
+        amount: order.totalAmount,
+        customerEmail: address.email,
+        customerPhone: address.phone,
+        customerName: address.name,
+      });
+
+      // Update order with Razorpay order ID
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { razorpayOrderId: razorpayOrderDetails.razorpayOrderId }
+      });
+    } catch (error) {
+      console.error('Error creating Razorpay order:', error);
+      throw new Error(`Failed to initialize payment: ${error.message}`);
+    }
+  }
+
+  // Send order confirmation email
+  try {
+    await sendEmail(
+      address.email,
+      'Order Confirmation - ' + order.orderNumber,
+      'order-confirmation',
+      {
+        customerName: address.name,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        trackingToken: order.trackingToken,
+        status: order.status,
+        paymentMethod,
+        totalAmount: order.totalAmount,
+        createdAt: order.createdAt,
+        items: order.items.map(item => ({
+          productName: item.productName,
+          color: item.color,
+          size: item.size,
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.subtotal
+        })),
+        addressLine1: orderAddress?.addressLine1 || '',
+        addressLine2: orderAddress?.addressLine2 || '',
+        city: orderAddress?.city || '',
+        state: orderAddress?.state || '',
+        postalCode: orderAddress?.postalCode || '',
+        country: orderAddress?.country || '',
+        phone: orderAddress?.phone || address.phone || '',
+        trackingUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/track/${order.trackingToken}`
+      }
+    );
+  } catch (emailError) {
+    console.error('Error sending order confirmation email:', emailError);
+    // Don't throw error - order creation should succeed even if email fails  
+    }
+    return {
+      accessToken, // Return access token for guest user session
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      trackingToken: order.trackingToken,
+      totalAmount: order.totalAmount,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      paymentMethod: order.paymentMethod,
+      items: order.items,
+      // Return Razorpay details if applicable
+      ...(razorpayOrderDetails && {
+        razorpayOrderId: razorpayOrderDetails.razorpayOrderId,
+        razorpayAmount: razorpayOrderDetails.amount,
+        razorpayCurrency: razorpayOrderDetails.currency,
+      }),
+      // For COD, indicate payment to be collected on delivery
+      ...(paymentMethod === 'COD' && {
+        message: 'Order created successfully. Payment to be collected on delivery.'
+      })
+    };
+  };
+
+  const getCustomerOrders = async (userId, filters = {}) => {
   const { status, skip = 0, take = 10 } = filters;
 
   const where = { userId };
@@ -658,10 +964,304 @@ const cancelCustomerOrder = async (userId, orderId, reason = '') => {
   };
 };
 
+// ======================== GUEST ORDER ENDPOINTS ========================
+
+const createGuestOrder = async (sessionId, addressData, paymentMethod) => {
+  const { name, phone, email, addressLine1, addressLine2, city, state, postalCode, country } = addressData;
+
+  // Validate required fields
+  if (!name || !phone || !email || !addressLine1 || !city || !state || !postalCode || !country || !paymentMethod) {
+    throw new Error('All address fields (including email) and payment method are required');
+  }
+
+  // Get guest session first
+  const session = await prisma.guestSession.findUnique({
+    where: { sessionId }
+  });
+
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  // Then get the session's associated cart with items
+  const sessionCart = await prisma.cart.findFirst({
+    where: { sessionId: session.id },
+    include: { items: { include: { variant: { include: { product: true } } } } }
+  });
+
+  if (!sessionCart || sessionCart.items.length === 0) {
+    throw new Error('Cart is empty');
+  }
+
+  const cart = sessionCart;
+
+  // Calculate total
+  const totalAmount = cart.items.reduce((sum, item) => sum + (parseFloat(item.unitPrice) * item.quantity), 0);
+
+  // Generate order number
+  const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+  // Create guest order with transaction
+  const order = await prisma.$transaction(async (tx) => {
+    // Create order (guest order - no userId)
+    const newOrder = await tx.order.create({
+      data: {
+        orderNumber,
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        paymentMethod,
+        totalAmount: parseFloat(totalAmount),
+        items: {
+          create: cart.items.map(item => ({
+            variantId: item.variantId,
+            productName: item.variant.product.name,
+            color: item.variant.color,
+            size: item.variant.size,
+            price: item.unitPrice,
+            quantity: item.quantity,
+            subtotal: parseFloat(item.unitPrice) * item.quantity
+          }))
+        }
+      },
+      include: {
+        items: { include: { variant: { include: { product: true } } } },
+        payments: true,
+        shipments: true
+      }
+    });
+
+    // Create order address
+    await tx.orderAddress.create({
+      data: {
+        orderId: newOrder.id,
+        name,
+        phone,
+        email,
+        addressLine1,
+        addressLine2,
+        city,
+        state,
+        postalCode,
+        country
+      }
+    });
+
+    // Create initial shipment
+    await tx.orderShipment.create({
+      data: {
+        orderId: newOrder.id,
+        status: 'PENDING'
+      }
+    });
+
+    // Mark inventory as HOLD
+    for (const item of cart.items) {
+      await tx.inventoryLog.create({
+        data: {
+          variantId: item.variantId,
+          orderId: newOrder.id,
+          type: 'HOLD',
+          quantity: item.quantity,
+          note: 'Guest order created, awaiting payment'
+        }
+      });
+    }
+
+    return newOrder;
+  });
+
+  // If Razorpay, create Razorpay order
+  let razorpayOrderDetails = null;
+  if (paymentMethod === 'RAZORPAY') {
+    try {
+      razorpayOrderDetails = await razorpayService.createRazorpayOrder({
+        orderId: order.id,
+        amount: totalAmount,
+        customerEmail: email,
+        customerPhone: phone,
+        customerName: name,
+      });
+
+      // Update order with Razorpay order ID
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { razorpayOrderId: razorpayOrderDetails.razorpayOrderId }
+      });
+    } catch (error) {
+      console.error('Error creating Razorpay order:', error);
+      throw new Error(`Failed to initialize payment: ${error.message}`);
+    }
+  }
+
+  // Get order address for email
+  const orderAddress = await prisma.orderAddress.findFirst({
+    where: { orderId: order.id }
+  });
+
+  // Send order confirmation email
+  try {
+    await sendEmail(
+      email,
+      'Order Confirmation - ' + order.orderNumber,
+      'order-confirmation',
+      {
+        customerName: name,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        paymentMethod,
+        totalAmount: order.totalAmount,
+        createdAt: order.createdAt,
+        items: order.items.map(item => ({
+          productName: item.productName,
+          color: item.color,
+          size: item.size,
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.subtotal
+        })),
+        addressLine1: orderAddress?.addressLine1 || '',
+        addressLine2: orderAddress?.addressLine2 || '',
+        city: orderAddress?.city || '',
+        state: orderAddress?.state || '',
+        postalCode: orderAddress?.postalCode || '',
+        country: orderAddress?.country || '',
+        phone: orderAddress?.phone || phone || '',
+        trackingUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/orders/${order.id}`
+      }
+    );
+  } catch (emailError) {
+    console.error('Error sending order confirmation email:', emailError);
+    // Don't throw error - order creation should succeed even if email fails
+  }
+
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    totalAmount: order.totalAmount,
+    status: order.status,
+    paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod,
+    items: order.items,
+    // Return Razorpay details if applicable
+    ...(razorpayOrderDetails && {
+      razorpayOrderId: razorpayOrderDetails.razorpayOrderId,
+      razorpayAmount: razorpayOrderDetails.amount,
+      razorpayCurrency: razorpayOrderDetails.currency,
+    }),
+    // For COD, indicate payment to be collected on delivery
+    ...(paymentMethod === 'COD' && {
+      message: 'Order created successfully. Payment to be collected on delivery.'
+    })
+  };
+};
+
+const getGuestOrderDetail = async (sessionId, orderId) => {
+  // Verify the order belongs to this session
+  const session = await prisma.guestSession.findUnique({
+    where: { sessionId }
+  });
+
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      items: { include: { variant: { include: { product: true } } } },
+      shipments: true,
+      payments: true,
+      orderAddress: true
+    }
+  });
+
+  if (!order || order.userId !== null) {
+    // For guest orders, userId should be null
+    throw new Error('Order not found');
+  }
+
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod,
+    totalAmount: order.totalAmount,
+    createdAt: order.createdAt,
+    items: order.items.map(item => ({
+      id: item.id,
+      productName: item.productName,
+      color: item.color,
+      size: item.size,
+      quantity: item.quantity,
+      price: item.price,
+      subtotal: item.subtotal,
+      productImage: item.variant?.product?.variants?.[0]?.images?.[0]?.url
+    })),
+    address: order.orderAddress,
+    shipment: order.shipments[0] ? {
+      status: order.shipments[0].status,
+      courierName: order.shipments[0].courierName,
+      trackingNumber: order.shipments[0].trackingNumber,
+      trackingUrl: order.shipments[0].trackingUrl,
+      shippedAt: order.shipments[0].shippedAt
+    } : null,
+    payments: order.payments.map(p => ({
+      gateway: p.gateway,
+      status: p.status,
+      amount: p.amount,
+      paidAt: p.paidAt
+    }))
+  };
+};
+
+const trackGuestOrder = async (sessionId, orderId) => {
+  // Verify the order belongs to this session
+  const session = await prisma.guestSession.findUnique({
+    where: { sessionId }
+  });
+
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      items: true,
+      shipments: true
+    }
+  });
+
+  if (!order || order.userId !== null) {
+    throw new Error('Order not found');
+  }
+
+  const shipment = order.shipments[0];
+
+  return {
+    orderNumber: order.orderNumber,
+    status: order.status,
+    shipmentStatus: shipment?.status || 'PENDING',
+    shipmentDetails: shipment ? {
+      courierName: shipment.courierName,
+      trackingNumber: shipment.trackingNumber,
+      trackingUrl: shipment.trackingUrl,
+      shippedAt: shipment.shippedAt,
+      estimatedDelivery: shipment.shippedAt ? new Date(new Date(shipment.shippedAt).getTime() + 5 * 24 * 60 * 60 * 1000) : null
+    } : null,
+    itemCount: order.items.length,
+    totalAmount: order.totalAmount,
+    createdAt: order.createdAt
+  };
+};
+
 module.exports = {
   // Order CRUD (Admin)
   getOrders,
   getOrderById,
+  getOrderByTrackingToken,
   // Status Management (Admin)
   updateOrderStatus,
   updatePaymentStatus,
@@ -676,8 +1276,13 @@ module.exports = {
   getOrderItems,
   // Customer-facing endpoints
   createOrderFromCart,
+  createOrderFromCartAsGuest,
   getCustomerOrders,
   getCustomerOrderDetail,
   trackOrder,
-  cancelCustomerOrder
+  cancelCustomerOrder,
+  // Guest order endpoints
+  createGuestOrder,
+  getGuestOrderDetail,
+  trackGuestOrder
 };

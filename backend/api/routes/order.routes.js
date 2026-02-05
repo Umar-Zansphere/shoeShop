@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const orderController = require('../controller/order.controller');
-const { verifyToken } = require('../middleware/auth.middleware');
+const { verifyToken, optionalAuth, manageGuestSession } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 
 // ======================== ADMIN ROUTES (Protected by admin middleware) ========================
@@ -35,8 +35,8 @@ router.get('/admin/:orderId/items', verifyToken, verifyAdmin, orderController.ge
 
 // ======================== CUSTOMER ROUTES (Protected by auth middleware) ========================
 
-// Create order from cart (checkout)
-router.post('/', verifyToken, orderController.createOrderFromCart);
+// Create order from cart (checkout) - supports both authenticated and guest users
+router.post('/', optionalAuth, manageGuestSession, orderController.createOrderFromCart);
 
 // Get all orders for logged-in customer
 router.get('/', verifyToken, orderController.getCustomerOrders);
@@ -44,11 +44,25 @@ router.get('/', verifyToken, orderController.getCustomerOrders);
 // Get order detail for customer
 router.get('/:orderId', verifyToken, orderController.getCustomerOrderDetail);
 
-// Track order
+// Track order by tracking token (public - no auth required)
+router.get('/track/:trackingToken', orderController.trackOrderByToken);
+
+// Track order (customer)
 router.get('/:orderId/track', verifyToken, orderController.trackOrder);
 
 // Cancel order (customer can only cancel pending orders)
 router.post('/:orderId/cancel', verifyToken, orderController.cancelCustomerOrder);
+
+// ======================== GUEST ROUTES (Session-based, no auth required) ========================
+
+// Create guest order
+router.post('/guest', orderController.createGuestOrder);
+
+// Get guest order detail
+router.get('/guest/:orderId', orderController.getGuestOrderDetail);
+
+// Track guest order
+router.get('/guest/:orderId/track', orderController.trackGuestOrder);
 
 // ======================== PAYMENT ROUTES ========================
 

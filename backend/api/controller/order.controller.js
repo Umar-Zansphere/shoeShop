@@ -176,21 +176,52 @@ const getOrderItems = async (req, res, next) => {
 
 const createOrderFromCart = async (req, res, next) => {
   try {
-    const userId = req.user.id; // From auth middleware
-    const { addressId, paymentMethod } = req.body;
+    const userId = req.user?.id; // From auth middleware (optional)
+    const sessionId = req.sessionId; // From manageGuestSession middleware
+    const { addressId, address, paymentMethod } = req.body;
 
-    if (!addressId || !paymentMethod) {
-      return res.status(400).json({ message: 'Address ID and payment method are required' });
+    // Authenticated user flow
+    if (userId && addressId) {
+      if (!paymentMethod) {
+        return res.status(400).json({ message: 'Payment method is required' });
+      }
+      const result = await orderService.createOrderFromCart(userId, {
+        addressId,
+        paymentMethod
+      });
+      return res.status(201).json({
+        success: true,
+        data: result
+      });
     }
 
-    const result = await orderService.createOrderFromCart(userId, {
-      addressId,
-      paymentMethod
-    });
+    // Guest user flow
+    if (!userId && sessionId && address) {
+      if (!address.email || !address.phone) {
+        return res.status(400).json({ message: 'Email and phone are required for guest checkout' });
+      }
+      if (!paymentMethod) {
+        return res.status(400).json({ message: 'Payment method is required' });
+      }
 
-    res.status(201).json({
-      success: true,
-      data: result
+      const result = await orderService.createOrderFromCartAsGuest(sessionId, {
+        address,
+        paymentMethod,
+      });
+      res.cookie('accessToken', result.accessToken, {
+        httpOnly: true, 
+        secure: true,
+        sameSite: 'none', 
+        maxAge: 7 * 24 * 60 * 60 * 1000, 
+      });
+      return res.status(201).json({
+        success: true,
+        data: result
+      });
+    }
+
+    return res.status(400).json({
+      message: 'Invalid request. Provide either addressId (authenticated) or address + sessionId (guest)'
     });
   } catch (error) {
     next(error);
@@ -251,6 +282,39 @@ const trackOrder = async (req, res, next) => {
     res.json({
       success: true,
       data: tracking
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Track order by tracking token (public endpoint - no authentication required)
+ * Used for guest users or email-based tracking links
+ */
+const trackOrderByToken = async (req, res, next) => {
+  try {
+    const { trackingToken } = req.params;
+
+    if (!trackingToken) {
+      return res.status(400).json({ message: 'Tracking token is required' });
+    }
+
+    const order = await orderService.getOrderByTrackingToken(trackingToken);
+
+    res.json({
+      success: true,
+      data: {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        totalAmount: order.totalAmount,
+        createdAt: order.createdAt,
+        items: order.items,
+        shipments: order.shipments,
+        orderAddress: order.orderAddress
+      }
     });
   } catch (error) {
     next(error);
@@ -406,6 +470,7 @@ module.exports = {
   getCustomerOrders,
   getCustomerOrderDetail,
   trackOrder,
+  trackOrderByToken,
   cancelCustomerOrder,
   // Payment endpoints
   verifyPayment,

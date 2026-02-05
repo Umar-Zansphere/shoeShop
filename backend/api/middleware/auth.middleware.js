@@ -2,6 +2,7 @@
 
 const jwt = require('jsonwebtoken');
 const prisma = require('../../config/prisma');
+const { getOrCreateSession, generateSessionId } = require('../services/session.services');
 
 const verifyToken = async (req, res, next) => {
   let token;
@@ -107,11 +108,60 @@ const optionalAuth = async (req, res, next) => {
 };
 
 /**
- * Extract session ID from request headers
- * Attaches sessionId to request if present
+ * Generate and manage guest session ID
+ * If no session ID provided, generates one and sets it in cookie
+ * Attaches sessionId to request for later use
+ */
+const manageGuestSession = async (req, res, next) => {
+  try {
+    // If user is authenticated, skip guest session
+    if (req.user && req.user.id) {
+      req.sessionId = null;
+      return next();
+    }
+
+    // Try to get session ID from header or cookie
+    let sessionId = req.headers['x-session-id'] || req.cookies.guestSessionId;
+
+    if (!sessionId) {
+      // Generate new session ID
+      sessionId = generateSessionId();
+      
+      // Create session in database
+      const session = await getOrCreateSession(sessionId);
+      
+      // Set session ID in cookie (30 days expiry)
+      res.cookie('guestSessionId', sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+      });
+      
+      req.sessionId = sessionId;
+      req.guestSessionDbId = session.id; // Also attach the database session ID
+      return next();
+    }
+
+    // Validate existing session exists in database
+    const session = await getOrCreateSession(sessionId);
+    req.sessionId = sessionId;
+    req.guestSessionDbId = session.id;
+
+    next();
+  } catch (error) {
+    console.error('Error in manageGuestSession:', error);
+    next(error);
+  }
+};
+
+/**
+ * Extract session ID from request (header or cookie)
+ * Now primarily used as fallback if manageGuestSession is not in middleware chain
+ * @deprecated Use manageGuestSession instead
  */
 const extractSession = (req, res, next) => {
-  const sessionId = req.headers['x-session-id'];
+  const sessionId = req.headers['x-session-id'] || req.cookies.guestSessionId;
   req.sessionId = sessionId || null;
   next();
 };
@@ -143,6 +193,7 @@ const requireAuthOrSession = async (req, res, next) => {
 module.exports = {
   verifyToken,
   optionalAuth,
+  manageGuestSession,
   extractSession,
   requireAuthOrSession
 };

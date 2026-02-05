@@ -9,7 +9,6 @@ const productRoutes = require('./product.routes');
 const orderRoutes = require('./order.routes');
 const adminRoutes = require('./admin.routes');
 const sessionRoutes = require('./session.routes');
-const orderTrackingRoutes = require('./orderTracking.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -20,7 +19,6 @@ router.use('/wishlist', wishlistRoutes);
 router.use('/orders', orderRoutes);
 router.use('/admin', adminRoutes);
 router.use('/session', sessionRoutes);
-router.use('/orders/track', orderTrackingRoutes);
 
 module.exports = router;
 

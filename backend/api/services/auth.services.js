@@ -234,8 +234,13 @@ const hashOTP = (otp) => {
   return crypto.createHash('sha256').update(otp).digest('hex');
 };
 
-const sendPhoneVerification = async (userId, phoneNumber) => {
+const sendPhoneVerification = async (userId, phoneNumber, email) => {
   try {
+    // Validate email is provided
+    if (!email) {
+      throw new Error('Email is required to send verification code.');
+    }
+
     // Generate OTP
     const otp = generateOTP();
     const otpHash = hashOTP(otp);
@@ -264,19 +269,22 @@ const sendPhoneVerification = async (userId, phoneNumber) => {
       },
     });
 
-    const message = `Your SoleMate verification code is: ${otp}. This code expires in 10 minutes.`;
-    console.log(`[SMS OTP] Message ready for ${phoneNumber}: ${message}`);
-    // TODO: Integrate SMS service (Twilio, AWS SNS, etc.)
-    // await smsService.sendOTP(phoneNumber, otp);
+    // Send OTP via email
+    await sendEmail(
+      email,
+      'Your SoleMate Verification Code',
+      'otp-verification',
+      { otp, purpose: 'VERIFICATION' }
+    );
 
     return {
       success: true,
-      message: `Verification code sent to ${phoneNumber} via SMS`,
+      message: `Verification code sent to ${email}`,
       expiresIn: 600, // 10 minutes in seconds
     };
   } catch (error) {
     console.error('Error sending phone verification OTP:', error);
-    throw new Error('Failed to send verification code. Please try again or use a different channel.');
+    throw new Error('Failed to send verification code. Please try again.');
   }
 };
 
@@ -346,8 +354,13 @@ const verifyPhoneOtp = async (userId, phoneNumber, otp) => {
   }
 };
 
-const phoneSignup = async (phoneNumber) => {
+const phoneSignup = async (phoneNumber, email) => {
   try {
+    // Validate email is provided
+    if (!email) {
+      throw new Error('Email is required to send verification code.');
+    }
+
     // Check if phone already exists and is verified
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -385,14 +398,17 @@ const phoneSignup = async (phoneNumber) => {
       },
     });
 
-    const message = `Your SoleMate signup code is: ${otp}. This code expires in 10 minutes.`;
-    console.log(`[SMS OTP] Message ready for ${phoneNumber}: ${message}`);
-    // TODO: Integrate SMS service (Twilio, AWS SNS, etc.)
-    // await smsService.sendOTP(phoneNumber, otp);
+    // Send OTP via email
+    await sendEmail(
+      email,
+      'Your SoleMate Signup Code',
+      'otp-verification',
+      { otp, purpose: 'SIGNUP' }
+    );
 
     return {
       success: true,
-      message: `Verification code sent to ${phoneNumber}`,
+      message: `Verification code sent to ${email}`,
       expiresIn: 600, // 10 minutes in seconds
     };
   } catch (error) {
@@ -513,6 +529,11 @@ const phoneLogin = async (phoneNumber) => {
       throw new Error('Phone number not registered. Please sign up first.');
     }
 
+    // Check if user has email
+    if (!user.email) {
+      throw new Error('Email is required to send verification code. Please update your profile.');
+    }
+
     // Generate OTP
     const otp = generateOTP();
     const otpHash = hashOTP(otp);
@@ -540,14 +561,17 @@ const phoneLogin = async (phoneNumber) => {
       },
     });
 
-    const message = `Your SoleMate login code is: ${otp}. This code expires in 10 minutes.`;
-    console.log(`[SMS OTP] Message ready for ${phoneNumber}: ${message}`);
-    // TODO: Integrate SMS service (Twilio, AWS SNS, etc.)
-    // await smsService.sendOTP(phoneNumber, otp);
+    // Send OTP via email
+    await sendEmail(
+      user.email,
+      'Your SoleMate Login Code',
+      'otp-verification',
+      { otp, purpose: 'LOGIN' }
+    );
 
     return {
       success: true,
-      message: `Verification code sent to ${phoneNumber}`,
+      message: `Verification code sent to ${user.email}`,
       expiresIn: 600, // 10 minutes in seconds
     };
   } catch (error) {

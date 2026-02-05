@@ -23,15 +23,18 @@ export default function CheckoutPage() {
 
   // Guest user fields
   const [isGuest, setIsGuest] = useState(false);
+  const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [guestAddress, setGuestAddress] = useState({
     name: '',
+    email: '',
     phone: '',
     addressLine1: '',
     addressLine2: '',
     city: '',
     state: '',
     postalCode: '',
+    country: 'India',
   });
 
   useEffect(() => {
@@ -83,13 +86,19 @@ export default function CheckoutPage() {
   }, [router, showToast]);
 
   const validateGuestAddress = () => {
-    if (!guestAddress.name || !guestAddress.phone || !guestAddress.addressLine1 ||
+    if (!guestAddress.name || !guestAddress.email || !guestAddress.phone || !guestAddress.addressLine1 ||
       !guestAddress.city || !guestAddress.state || !guestAddress.postalCode) {
       showToast('Please fill in all required address fields', 'warning');
       return false;
     }
     if (guestAddress.phone.length !== 10) {
       showToast('Please enter a valid 10-digit phone number', 'warning');
+      return false;
+    }
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(guestAddress.email)) {
+      showToast('Please enter a valid email address', 'warning');
       return false;
     }
     return true;
@@ -131,8 +140,18 @@ export default function CheckoutPage() {
       console.log('Order created:', orderData);
       showToast('Order created successfully!', 'success');
 
-      // Step 2: Initialize Razorpay payment
-      if (paymentMethod === 'RAZORPAY') {
+      // Step 2: Determine next action based on payment method
+      if (paymentMethod === 'COD') {
+        // For COD, redirect to confirmation page
+        const orderInfo = btoa(JSON.stringify({
+          orderId: orderData.orderId,
+          orderNumber: orderData.orderNumber,
+          totalAmount: orderData.totalAmount,
+          paymentMethod: 'COD'
+        }));
+        router.push(`/order-confirmation?order=${orderInfo}`);
+      } else if (paymentMethod === 'RAZORPAY') {
+        // Initialize Razorpay payment
         const totalAmount = cart.reduce((sum, item) => sum + (parseFloat(item.unitPrice) * item.quantity), 0);
         const taxAmount = totalAmount * 0.18;
         const finalAmount = totalAmount + taxAmount;
@@ -159,13 +178,19 @@ export default function CheckoutPage() {
                 console.log('Payment verified successfully');
                 showToast('Payment successful!', 'success');
 
+                // Redirect to confirmation page
+                const orderInfo = btoa(JSON.stringify({
+                  orderId: orderData.orderId,
+                  orderNumber: orderData.orderNumber,
+                  totalAmount: orderData.totalAmount,
+                  paymentMethod: 'RAZORPAY'
+                }));
+
                 // Redirect based on user type
                 if (isGuest) {
-                  // For guests, show order number and tracking info
-                  router.push(`/track-order?orderNumber=${orderData.orderNumber}&phone=${guestAddress.phone}`);
+                  router.push(`/order-confirmation?order=${orderInfo}`);
                 } else {
-                  // For logged-in users, go to order detail
-                  router.push(`/orders/${orderData.orderId}?payment=success`);
+                  router.push(`/order-confirmation?order=${orderInfo}`);
                 }
               } else {
                 showToast('Payment verification failed', 'error');
@@ -331,7 +356,7 @@ export default function CheckoutPage() {
               {isGuest ? (
                 /* Guest Address Form */
                 <div className="space-y-4">
-                  <p className="text-sm text-slate-600 mb-4">Please provide your delivery address:</p>
+                  <p className="text-sm text-slate-600 mb-4">Please provide your delivery details:</p>
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <input
@@ -342,13 +367,21 @@ export default function CheckoutPage() {
                       className="px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                     <input
-                      type="tel"
-                      placeholder="Phone Number (10 digits) *"
-                      value={guestAddress.phone}
-                      onChange={(e) => setGuestAddress({ ...guestAddress, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                      type="email"
+                      placeholder="Email Address *"
+                      value={guestAddress.email}
+                      onChange={(e) => setGuestAddress({ ...guestAddress, email: e.target.value })}
                       className="px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   </div>
+
+                  <input
+                    type="tel"
+                    placeholder="Phone Number (10 digits) *"
+                    value={guestAddress.phone}
+                    onChange={(e) => setGuestAddress({ ...guestAddress, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
 
                   <input
                     type="text"
@@ -486,18 +519,38 @@ export default function CheckoutPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <CheckCircle size={20} className="text-orange-600" />
-                        <p className="font-bold text-slate-900">Razorpay</p>
+                        <p className="font-bold text-slate-900">Online Payment</p>
                       </div>
                       <p className="text-sm text-slate-600 mt-1">Pay securely using credit/debit card, netbanking, or UPI</p>
                     </div>
                   </div>
                 </button>
 
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
-                  <p className="text-sm text-slate-600">
-                    <span className="font-semibold">Cash on Delivery</span> is currently unavailable
-                  </p>
-                </div>
+                <button
+                  onClick={() => setPaymentMethod('COD')}
+                  className={`w-full p-4 border-2 rounded-xl cursor-pointer transition-all text-left min-h-[44px] touch-manipulation active:scale-[0.98] ${paymentMethod === 'COD'
+                      ? 'border-orange-500 bg-slate-50 shadow-md'
+                      : 'border-slate-200 hover:border-orange-300 bg-white hover:bg-slate-50'
+                    }`}
+                >
+                  <div className="flex gap-3 items-center">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${paymentMethod === 'COD'
+                        ? 'border-orange-500 bg-orange-500'
+                        : 'border-slate-300'
+                      }`}>
+                      {paymentMethod === 'COD' && (
+                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Truck size={20} className="text-green-600" />
+                        <p className="font-bold text-slate-900">Cash on Delivery</p>
+                      </div>
+                      <p className="text-sm text-slate-600 mt-1">Pay when you receive your order at the door</p>
+                    </div>
+                  </div>
+                </button>
               </div>
             </div>
 

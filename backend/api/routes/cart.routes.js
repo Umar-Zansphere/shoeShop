@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const cartController = require('../controller/cart.controller');
-const { optionalAuth, extractSession } = require('../middleware/auth.middleware');
+const { optionalAuth, manageGuestSession } = require('../middleware/auth.middleware');
 
 // All cart routes support both authenticated users and guest sessions
 router.use(optionalAuth);
-router.use(extractSession);
+router.use(manageGuestSession);
 
 // ======================== CART ROUTES ========================
 

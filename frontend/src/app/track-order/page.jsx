@@ -13,8 +13,9 @@ export default function TrackOrderPage() {
     const searchParams = useSearchParams();
     const { showToast } = useToast();
 
-    const [step, setStep] = useState(1); // 1: Enter phone, 2: Enter OTP, 3: Show order
+    const [step, setStep] = useState(1); // 1: Enter order details, 2: Enter OTP, 3: Show order
     const [phoneNumber, setPhoneNumber] = useState(searchParams.get('phone') || '');
+    const [email, setEmail] = useState('');
     const [orderNumber, setOrderNumber] = useState(searchParams.get('orderNumber') || '');
     const [otp, setOtp] = useState('');
     const [order, setOrder] = useState(null);
@@ -24,20 +25,25 @@ export default function TrackOrderPage() {
     const handleRequestOTP = async (e) => {
         e.preventDefault();
 
-        if (!phoneNumber || phoneNumber.length !== 10) {
-            showToast('Please enter a valid 10-digit phone number', 'warning');
+        if (!orderNumber) {
+            showToast('Please enter an order number', 'warning');
+            return;
+        }
+
+        if (!email || !email.includes('@')) {
+            showToast('Please enter a valid email address', 'warning');
             return;
         }
 
         try {
             setLoading(true);
-            const response = await orderApi.requestTrackingOTP(phoneNumber);
+            const response = await orderApi.requestTrackingOTP(orderNumber, email);
 
             if (response.success) {
-                showToast('OTP sent to your phone number', 'success');
+                showToast('Verification code sent to your email', 'success');
                 setStep(2);
             } else {
-                showToast(response.message || 'Failed to send OTP', 'error');
+                showToast(response.message || 'Failed to send verification code', 'error');
             }
         } catch (err) {
             showToast(err.message || 'Error sending OTP', 'error');
@@ -56,7 +62,7 @@ export default function TrackOrderPage() {
 
         try {
             setLoading(true);
-            const response = await orderApi.verifyTrackingOTP(phoneNumber, otp);
+            const response = await orderApi.verifyTrackingOTP(email, otp);
 
             if (response.success) {
                 showToast('OTP verified successfully', 'success');
@@ -101,7 +107,7 @@ export default function TrackOrderPage() {
                             <Package size={32} className="text-orange-600" />
                         </div>
                         <h1 className="text-3xl font-bold text-gray-900 mb-2">Track Your Order</h1>
-                        <p className="text-gray-600">Enter your phone number to track your order status</p>
+                        <p className="text-gray-600">Enter your phone number to receive a tracking code via email</p>
                     </div>
 
                     {/* Step 1: Enter Phone Number */}
@@ -109,39 +115,48 @@ export default function TrackOrderPage() {
                         <form onSubmit={handleRequestOTP} className="space-y-6">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Phone Number
+                                    Order Number
                                 </label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                        <Phone size={20} className="text-gray-400" />
-                                    </div>
-                                    <input
-                                        type="tel"
-                                        value={phoneNumber}
-                                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                                        placeholder="Enter 10-digit phone number"
-                                        className="w-full pl-12 pr-4 py-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg"
-                                        required
-                                    />
-                                </div>
+                                <input
+                                    type="text"
+                                    value={orderNumber}
+                                    onChange={(e) => setOrderNumber(e.target.value.toUpperCase())}
+                                    placeholder="Enter your order number (e.g., ORD-1234567890-ABC)"
+                                    className="w-full px-4 py-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Email Address
+                                </label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="Enter your email address"
+                                    className="w-full px-4 py-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg"
+                                    required
+                                />
                                 <p className="text-sm text-gray-500 mt-2">
-                                    We'll send a 6-digit OTP to verify your identity
+                                    We'll send a 6-digit verification code to your email
                                 </p>
                             </div>
 
                             <button
                                 type="submit"
-                                disabled={loading || phoneNumber.length !== 10}
+                                disabled={loading || !email.includes('@') || !orderNumber}
                                 className="w-full px-6 py-4 min-h-[44px] bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed shadow-lg hover:shadow-xl touch-manipulation active:scale-95"
                             >
                                 {loading ? (
                                     <>
                                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                        Sending OTP...
+                                        Sending Code...
                                     </>
                                 ) : (
                                     <>
-                                        Send OTP
+                                        Send Verification Code
                                         <span className="text-lg">→</span>
                                     </>
                                 )}
@@ -156,26 +171,26 @@ export default function TrackOrderPage() {
                                 <div className="flex items-center gap-2 text-green-700">
                                     <CheckCircle size={20} />
                                     <p className="text-sm font-medium">
-                                        OTP sent to +91 {phoneNumber}
+                                        Verification code sent to {email}
                                     </p>
                                 </div>
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Enter OTP
+                                    Enter Verification Code
                                 </label>
                                 <input
                                     type="text"
                                     value={otp}
                                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                    placeholder="Enter 6-digit OTP"
+                                    placeholder="Enter 6-digit code"
                                     className="w-full px-4 py-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg text-center tracking-widest"
                                     maxLength={6}
                                     required
                                 />
                                 <p className="text-sm text-gray-500 mt-2 text-center">
-                                    Didn't receive OTP?{' '}
+                                    Didn't receive the code?{' '}
                                     <button
                                         type="button"
                                         onClick={() => setStep(1)}
@@ -252,10 +267,10 @@ export default function TrackOrderPage() {
                                 <div className="flex justify-between items-center pb-4 border-b border-gray-200">
                                     <span className="text-gray-600">Payment Status</span>
                                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${order.paymentStatus === 'SUCCESS'
-                                            ? 'bg-green-100 text-green-800'
-                                            : order.paymentStatus === 'PENDING'
-                                                ? 'bg-yellow-100 text-yellow-800'
-                                                : 'bg-red-100 text-red-800'
+                                        ? 'bg-green-100 text-green-800'
+                                        : order.paymentStatus === 'PENDING'
+                                            ? 'bg-yellow-100 text-yellow-800'
+                                            : 'bg-red-100 text-red-800'
                                         }`}>
                                         {order.paymentStatus}
                                     </span>

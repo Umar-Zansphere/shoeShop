@@ -7,7 +7,6 @@ const makeRequest = async (url, options = {}) => {
     headers: {
       'ngrok-skip-browser-warning': 'true',
       'Content-Type': 'application/json',
-      ...(sessionId ? { 'x-session-id': sessionId } : {}),
       ...options.headers,
     },
     ...options,
@@ -389,7 +388,23 @@ export const orderApi = {
       credentials: 'include',
       body: JSON.stringify({ reason })
     });
-  }
+  },
+
+  // Request tracking OTP for guest orders
+  requestTrackingOTP: async (orderNumber, email) => {
+    return makeRequest('/api/orders/track/request', {
+      method: 'POST',
+      body: JSON.stringify({ orderNumber, email })
+    });
+  },
+
+  // Verify tracking OTP for guest orders
+  verifyTrackingOTP: async (email, otp) => {
+    return makeRequest('/api/orders/track/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp })
+    });
+  },
 };
 
 // User API - Profile and account management

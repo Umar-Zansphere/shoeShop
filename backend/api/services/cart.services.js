@@ -1,5 +1,21 @@
 const prisma = require('../../config/prisma');
 
+// ======================== HELPER FUNCTIONS ========================
+
+/**
+ * Get guest session by sessionId (from cookie/header)
+ * Middleware ensures session exists before calling service
+ */
+const getGuestSessionId = async (sessionId) => {
+  if (!sessionId) return null;
+  
+  const session = await prisma.guestSession.findUnique({
+    where: { sessionId }
+  });
+  
+  return session?.id || null;
+};
+
 // ======================== CART MANAGEMENT ========================
 
 const getActiveCart = async (userId = null, sessionId = null) => {
@@ -7,18 +23,20 @@ const getActiveCart = async (userId = null, sessionId = null) => {
     throw new Error('Either userId or sessionId must be provided');
   }
 
-  let guestSession = null;
+  let guestSessionId = null;
 
-  // 1️⃣ Ensure guest session exists
+  // 1️⃣ Get guest session DB ID from sessionId
   if (!userId && sessionId) {
-    const { getOrCreateSession } = require('./session.services');
-    guestSession = await getOrCreateSession(sessionId);
+    guestSessionId = await getGuestSessionId(sessionId);
+    if (!guestSessionId) {
+      throw new Error('Invalid session');
+    }
   }
 
   // 2️⃣ Build where clause
   const whereClause = {
     status: 'ACTIVE',
-    ...(userId ? { userId } : { sessionId: guestSession.id }),
+    ...(userId ? { userId } : { sessionId: guestSessionId }),
   };
 
   // 3️⃣ Try to fetch existing cart
@@ -61,7 +79,7 @@ const getActiveCart = async (userId = null, sessionId = null) => {
     cart = await prisma.cart.create({
       data: {
         status: 'ACTIVE',
-        ...(userId ? { userId } : { sessionId: guestSession.id }),
+        ...(userId ? { userId } : { sessionId: guestSessionId }),
       },
       include: {
         items: {
@@ -103,11 +121,12 @@ const addToCart = async (userId = null, sessionId = null, variantId, quantity = 
     throw new Error('Insufficient inventory');
   }
 
-  // Ensure guest session exists if sessionId provided
-  let guestSession = null;
+  let guestSessionId = null;
   if (!userId && sessionId) {
-    const { getOrCreateSession } = require('./session.services');
-    guestSession = await getOrCreateSession(sessionId);
+    guestSessionId = await getGuestSessionId(sessionId);
+    if (!guestSessionId) {
+      throw new Error('Invalid session');
+    }
   }
 
   // Get or create active cart
@@ -115,8 +134,7 @@ const addToCart = async (userId = null, sessionId = null, variantId, quantity = 
   if (userId) {
     whereClause.userId = userId;
   } else if (sessionId) {
-    whereClause.sessionId = guestSession.id;
-    console.log('Session ID:', sessionId);
+    whereClause.sessionId = guestSessionId;
   } else {
     throw new Error('Either userId or sessionId must be provided');
   }
@@ -128,7 +146,7 @@ const addToCart = async (userId = null, sessionId = null, variantId, quantity = 
     if (userId) {
       cartData.userId = userId;
     } else {
-      cartData.sessionId = guestSession.id;
+      cartData.sessionId = guestSessionId;
     }
     cart = await prisma.cart.create({ data: cartData });
   }
@@ -205,7 +223,7 @@ const updateCartItem = async (userId = null, sessionId = null, cartItemId, quant
   if (userId) {
     cartWhere.userId = userId;
   } else if (sessionId) {
-    cartWhere.sessionId = guestSession.id;
+    cartWhere.sessionId = guestSessionId;
   } else {
     throw new Error('Either userId or sessionId must be provided');
   }
@@ -254,18 +272,13 @@ const updateCartItem = async (userId = null, sessionId = null, cartItemId, quant
 
 const removeFromCart = async (userId = null, sessionId = null, cartItemId) => {
   // Ensure guest session exists if sessionId provided
-  let guestSession = null;
+  let guestSessionId = null;
   if (!userId && sessionId) {
-    const { getOrCreateSession } = require('./session.services');
-    guestSession = await getOrCreateSession(sessionId);
+    guestSessionId = await getGuestSessionId(sessionId);
+    if (!guestSessionId) {
+      throw new Error('Invalid session');
+    }
   }
-
-  // Build where clause
-  const cartWhere = {};
-  if (userId) {
-    cartWhere.userId = userId;
-  } else if (sessionId) {
-    cartWhere.sessionId = guestSession.id;
   } else {
     throw new Error('Either userId or sessionId must be provided');
   }
@@ -291,17 +304,19 @@ const removeFromCart = async (userId = null, sessionId = null, cartItemId) => {
 
 const clearCart = async (userId = null, sessionId = null) => {
   // Ensure guest session exists if sessionId provided
-  let guestSession = null;
+  let guestSessionId = null;
   if (!userId && sessionId) {
-    const { getOrCreateSession } = require('./session.services');
-    guestSession = await getOrCreateSession(sessionId);
+    guestSessionId = await getGuestSessionId(sessionId);
+    if (!guestSessionId) {
+      throw new Error('Invalid session');
+    }
   }
 
   const whereClause = { status: 'ACTIVE' };
   if (userId) {
     whereClause.userId = userId;
   } else if (sessionId) {
-    whereClause.sessionId = guestSession.id;
+    whereClause.sessionId = guestSessionId;
   } else {
     throw new Error('Either userId or sessionId must be provided');
   }
@@ -353,17 +368,19 @@ const getCartSummary = async (userId = null, sessionId = null) => {
 
 const getWishlist = async (userId = null, sessionId = null) => {
   // Ensure guest session exists if sessionId provided
-  let guestSession = null;
+  let guestSessionId = null;
   if (!userId && sessionId) {
-    const { getOrCreateSession } = require('./session.services');
-    guestSession = await getOrCreateSession(sessionId);
+    guestSessionId = await getGuestSessionId(sessionId);
+    if (!guestSessionId) {
+      throw new Error('Invalid session');
+    }
   }
 
   const whereClause = {};
   if (userId) {
     whereClause.userId = userId;
   } else if (sessionId) {
-    whereClause.sessionId = guestSession.id;
+    whereClause.sessionId = guestSessionId;
   } else {
     throw new Error('Either userId or sessionId must be provided');
   }
@@ -409,7 +426,7 @@ const getWishlist = async (userId = null, sessionId = null) => {
     if (userId) {
       wishlistData.userId = userId;
     } else {
-      wishlistData.sessionId = guestSession.id;
+      wishlistData.sessionId = guestSessionId;
     }
 
     wishlist = await prisma.wishlist.create({
@@ -443,10 +460,12 @@ const addToWishlist = async (userId = null, sessionId = null, productId, variant
   }
 
   // Ensure guest session exists if sessionId provided
-  let guestSession = null;
+  let guestSessionId = null;
   if (!userId && sessionId) {
-    const { getOrCreateSession } = require('./session.services');
-    guestSession = await getOrCreateSession(sessionId);
+    guestSessionId = await getGuestSessionId(sessionId);
+    if (!guestSessionId) {
+      throw new Error('Invalid session');
+    }
   }
 
   // Get or create wishlist
@@ -454,7 +473,7 @@ const addToWishlist = async (userId = null, sessionId = null, productId, variant
   if (userId) {
     whereClause.userId = userId;
   } else if (sessionId) {
-    whereClause.sessionId = guestSession.id;
+    whereClause.sessionId = guestSessionId;
   } else {
     throw new Error('Either userId or sessionId must be provided');
   }
@@ -466,7 +485,7 @@ const addToWishlist = async (userId = null, sessionId = null, productId, variant
     if (userId) {
       wishlistData.userId = userId;
     } else {
-      wishlistData.sessionId = guestSession.id;
+      wishlistData.sessionId = guestSessionId;
     }
     wishlist = await prisma.wishlist.create({ data: wishlistData });
   }
@@ -532,7 +551,7 @@ const removeFromWishlist = async (userId = null, sessionId = null, wishlistItemI
   if (userId) {
     wishlistWhere.userId = userId;
   } else if (sessionId) {
-    wishlistWhere.sessionId = guestSession.id;
+    wishlistWhere.sessionId = guestSessionId;
   } else {
     throw new Error('Either userId or sessionId must be provided');
   }
@@ -568,7 +587,7 @@ const moveToCart = async (userId = null, sessionId = null, wishlistItemId) => {
   if (userId) {
     wishlistWhere.userId = userId;
   } else if (sessionId) {
-    wishlistWhere.sessionId = guestSession.id;
+    wishlistWhere.sessionId = guestSessionId;
   } else {
     throw new Error('Either userId or sessionId must be provided');
   }
@@ -616,7 +635,7 @@ const clearWishlist = async (userId = null, sessionId = null) => {
   if (userId) {
     whereClause.userId = userId;
   } else if (sessionId) {
-    whereClause.sessionId = guestSession.id;
+    whereClause.sessionId = guestSessionId;
   } else {
     throw new Error('Either userId or sessionId must be provided');
   }
@@ -649,3 +668,6 @@ module.exports = {
   moveToCart,
   clearWishlist
 };
+
+
+
