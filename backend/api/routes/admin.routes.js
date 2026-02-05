@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const productController = require('../controller/product.controller');
-const orderController = require('../controller/order.controller');
+const productController = require('../controller/adminProduct.controller');
+const orderController = require('../controller/adminOrder.controller');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const { uploadInMemory } = require('../services/s3.services');
 
