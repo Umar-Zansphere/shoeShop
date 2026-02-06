@@ -1,7 +1,5 @@
 const prisma = require('../../config/prisma');
-const razorpayService = require('./razorpay.services');
-const { sendEmail } = require('../../config/email');
-const {generateTokens} = require('../services/auth.services');
+
 
 // ======================== ORDER CRUD ========================
 

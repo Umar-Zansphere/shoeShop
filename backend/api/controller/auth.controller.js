@@ -34,7 +34,6 @@ const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const result = await authService.login(email, password, req);
-    console.log("Login successful for user:", result.accessToken);
     const user = result.user;
     res.cookie('accessToken', result.accessToken, {
       httpOnly: true, 
@@ -42,7 +41,6 @@ const login = async (req, res, next) => {
       sameSite: 'none', 
       maxAge: 7 * 24 * 60 * 60 * 1000, 
     });
-    console.log("User data on login:", user);
     // Send back user data (excluding sensitive fields) along with the token
     const userData = {
       id: user.id,

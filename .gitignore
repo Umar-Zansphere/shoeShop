@@ -5,3 +5,4 @@ dist/
 backend/node_modules/
 backend/dist/
 frontend/node_modules/
+solemate/node_modules/

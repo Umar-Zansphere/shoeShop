@@ -1,276 +1,369 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Eye, Trash2, Filter, ShoppingCart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Package, ArrowRight } from 'lucide-react';
-import Header from '@/app/components/Header';
-import Footer from '@/app/components/Footer';
-import LoginPrompt from '@/components/LoginPrompt';
-import { orderApi } from '@/lib/api';
-import { useToast } from '@/components/ToastContext';
-import { OrdersLoadingSkeleton } from '@/components/LoadingSkeleton';
+import Card from '@/components/admin/Card';
+import Button from '@/components/admin/Button';
+import FormInput from '@/components/admin/FormInput';
+import FormSelect from '@/components/admin/FormSelect';
+import Alert from '@/components/admin/Alert';
+import { ordersApi } from '@/lib/adminApi';
 
 export default function OrdersPage() {
   const router = useRouter();
-  const { showToast } = useToast();
   const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState(null);
-  const [activeTab, setActiveTab] = useState('orders');
+  const [isLoading, setIsLoading] = useState(true);
+  const [alert, setAlert] = useState(null);
+  const [filters, setFilters] = useState({
+    status: '',
+    paymentStatus: '',
+  });
+  const [search, setSearch] = useState('');
+  const [pagination, setPagination] = useState({
+    skip: 0,
+    take: 12,
+    total: 0,
+  });
 
-  const itemsPerPage = 10;
-
-  // Fetch orders
   useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setLoading(true);
-
-        // Check if user is logged in
-        const token = localStorage.getItem('token');
-        if (!token) {
-          // Don't redirect, just stop loading to show login prompt
-          setLoading(false);
-          return;
-        }
-
-        const skip = (currentPage - 1) * itemsPerPage;
-        const response = await orderApi.getOrders(statusFilter, skip, itemsPerPage);
-
-        if (response.success) {
-          setOrders(response.data.orders);
-          setPagination(response.data.pagination);
-        } else {
-          showToast('Failed to load orders', 'error');
-        }
-      } catch (err) {
-        showToast(err.message || 'Error loading orders', 'error');
-        console.error('Error fetching orders:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchOrders();
-  }, [currentPage, statusFilter, router, showToast]);
+  }, [filters, pagination.skip]);
 
-  const handleStatusFilter = (status) => {
-    setStatusFilter(statusFilter === status ? null : status);
-    setCurrentPage(1);
+  const fetchOrders = async () => {
+    try {
+      setIsLoading(true);
+      const response = await ordersApi.getOrders({
+        ...filters,
+        search: search || undefined,
+        skip: pagination.skip,
+        take: pagination.take,
+      });
+
+      let ordersData = [];
+      let paginationData = { total: 0, skip: 0, take: 12, pages: 1 };
+
+      if (Array.isArray(response)) {
+        ordersData = response;
+      } else if (response && Array.isArray(response.data)) {
+        ordersData = response.data;
+        if (response.pagination) {
+          paginationData = response.pagination;
+        }
+      } else if (response && Array.isArray(response.orders)) {
+        ordersData = response.orders;
+        if (response.pagination) {
+          paginationData = response.pagination;
+        }
+      }
+
+      setOrders(ordersData);
+      console.log('Fetched orders:', ordersData);
+      setPagination((prev) => ({
+        ...prev,
+        total: paginationData.total || 0,
+      }));
+    } catch (error) {
+      setAlert({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load orders',
+      });
+      setOrders([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancel = async (orderId) => {
+    if (!window.confirm('Cancel this order?')) return;
+
+    try {
+      await ordersApi.cancelOrder(orderId);
+      setAlert({
+        type: 'success',
+        title: 'Success',
+        message: 'Order cancelled successfully',
+      });
+      fetchOrders();
+    } catch (error) {
+      setAlert({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to cancel order',
+      });
+    }
   };
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'PENDING':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'PAID':
-        return 'bg-blue-100 text-blue-800';
-      case 'SHIPPED':
-        return 'bg-purple-100 text-purple-800';
-      case 'DELIVERED':
-        return 'bg-green-100 text-green-800';
-      case 'CANCELLED':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+    const colors = {
+      PENDING: 'bg-warning-light text-warning',
+      PROCESSING: 'bg-info-light text-info',
+      SHIPPED: 'bg-info-light text-info',
+      DELIVERED: 'bg-success-light text-success',
+      CANCELLED: 'bg-error-light text-error',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-700';
+  };
+
+  const getStatusTextColor = (status) => {
+    const colors = {
+      PENDING: 'text-warning',
+      PROCESSING: 'text-info',
+      SHIPPED: 'text-info',
+      DELIVERED: 'text-success',
+      CANCELLED: 'text-error',
+    };
+    return colors[status] || 'text-gray-700';
   };
 
   const getPaymentStatusColor = (status) => {
-    switch (status) {
-      case 'SUCCESS':
-        return 'text-green-600';
-      case 'PENDING':
-        return 'text-yellow-600';
-      case 'FAILED':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
-    }
+    const colors = {
+      PENDING: 'bg-warning-light text-warning',
+      COMPLETED: 'bg-success-light text-success',
+      FAILED: 'bg-error-light text-error',
+      REFUNDED: 'bg-gray-100 text-gray-700',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-700';
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <Header />
-        <OrdersLoadingSkeleton />
-        <Footer activeTab={activeTab} onTabChange={setActiveTab} />
-      </div>
-    );
-  }
+  const getPaymentStatusTextColor = (status) => {
+    const colors = {
+      PENDING: 'text-warning',
+      COMPLETED: 'text-success',
+      FAILED: 'text-error',
+      REFUNDED: 'text-gray-700',
+    };
+    return colors[status] || 'text-gray-700';
+  };
 
-  // Check if user is logged in
-  const token = localStorage.getItem('token');
-  if (!token) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <Header />
-        <LoginPrompt
-          title="View Your Orders"
-          message="Log in to track your orders, view order history, and manage returns"
-          showGuestOption={true}
-        />
-        <Footer activeTab={activeTab} onTabChange={setActiveTab} />
-      </div>
-    );
-  }
+  const currentPage = Math.floor(pagination.skip / pagination.take) + 1;
+  const totalPages = Math.ceil(pagination.total / pagination.take);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header />
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
+        <p className="text-gray-600 mt-1">Manage and track customer orders</p>
+      </div>
 
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full">
-        {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">My Orders</h1>
-          <p className="text-gray-600">Track and manage your orders</p>
+      {/* Alerts */}
+      {alert && (
+        <Alert
+          type={alert.type}
+          title={alert.title}
+          message={alert.message}
+          onClose={() => setAlert(null)}
+        />
+      )}
+
+      {/* Filters */}
+      <Card>
+        <h3 className="font-semibold text-gray-900 flex items-center gap-2 mb-4">
+          <Filter size={18} />
+          Filters
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <FormInput
+            placeholder="Search by order ID or number..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPagination((prev) => ({ ...prev, skip: 0 }));
+            }}
+          />
+          <FormSelect
+            placeholder="All Statuses"
+            value={filters.status}
+            onChange={(e) => {
+              setFilters((prev) => ({ ...prev, status: e.target.value }));
+              setPagination((prev) => ({ ...prev, skip: 0 }));
+            }}
+            options={[
+              { label: 'Pending', value: 'PENDING' },
+              { label: 'Processing', value: 'PROCESSING' },
+              { label: 'Shipped', value: 'SHIPPED' },
+              { label: 'Delivered', value: 'DELIVERED' },
+              { label: 'Cancelled', value: 'CANCELLED' },
+            ]}
+            searchable
+          />
+          <FormSelect
+            placeholder="All Payment Status"
+            value={filters.paymentStatus}
+            onChange={(e) => {
+              setFilters((prev) => ({ ...prev, paymentStatus: e.target.value }));
+              setPagination((prev) => ({ ...prev, skip: 0 }));
+            }}
+            options={[
+              { label: 'Pending', value: 'PENDING' },
+              { label: 'Completed', value: 'COMPLETED' },
+              { label: 'Failed', value: 'FAILED' },
+              { label: 'Refunded', value: 'REFUNDED' },
+            ]}
+            searchable
+          />
         </div>
+      </Card>
 
-        {/* Status Filters */}
-        <div className="mb-6 flex flex-wrap gap-2">
-          {['PENDING', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'].map((status) => (
-            <button
-              key={status}
-              onClick={() => handleStatusFilter(status)}
-              className={`px-4 py-2 min-h-[44px] rounded-lg font-medium transition-all touch-manipulation active:scale-95 ${statusFilter === status
-                ? 'bg-[#172031] text-white shadow-md'
-                : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400'
-                }`}
-            >
-              {status}
-            </button>
+      {/* Orders Grid */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="h-48 animate-pulse">
+              <div className="h-full bg-gray-100 rounded"></div>
+            </Card>
           ))}
         </div>
-
-        {/* Empty State */}
-        {!loading && orders.length === 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <Package size={48} className="mx-auto mb-4 text-gray-400" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No orders yet</h3>
-            <p className="text-gray-600 mb-6">You haven't placed any orders yet. Start shopping to create your first order!</p>
-            <button
-              onClick={() => router.push('/products')}
-              className="px-6 py-3 min-h-[44px] bg-[#172031] text-white rounded-lg hover:bg-[#232e42] transition-colors touch-manipulation active:scale-95"
-            >
-              Start Shopping
-            </button>
-          </div>
-        )}
-
-        {/* Orders List */}
-        {!loading && orders.length > 0 && (
-          <div className="grid gap-4">
-            {orders.map((order) => (
-              <div
-                key={order.id}
-                onClick={() => router.push(`/orders/${order.id}`)}
-                className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer touch-manipulation active:scale-[0.99]"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  {/* Left Section */}
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Order #{order.orderNumber}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          {new Date(order.createdAt).toLocaleDateString('en-IN', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Order Details */}
-                    <div className="grid grid-cols-2 gap-4 my-4">
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Items</p>
-                        <p className="font-semibold text-gray-900">{order.itemCount}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Total</p>
-                        <p className="font-semibold text-gray-900">₹{parseFloat(order.totalAmount).toFixed(2)}</p>
-                      </div>
-                    </div>
-
-                    {/* Status Badges */}
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
-                        {order.status}
-                      </span>
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium bg-gray-100 ${getPaymentStatusColor(order.paymentStatus)}`}>
-                        Payment: {order.paymentStatus}
-                      </span>
-                      {order.shipmentStatus && order.status !== 'CANCELLED' && (
-                        <span className="px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-700">
-                          {order.shipmentStatus}
-                        </span>
-                      )}
-                    </div>
+      ) : orders.length === 0 ? (
+        <Card className="text-center py-12">
+          <ShoppingCart size={48} className="mx-auto text-gray-400 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No orders found</h3>
+          <p className="text-gray-600">Try adjusting your filters</p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {orders.map((order) => (
+            <Card key={order.id} hover className="flex flex-col">
+              {/* Order Header */}
+              <div className="mb-4">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Order ID</p>
+                    <p className="font-mono font-semibold text-gray-900 text-sm truncate">
+                      {order.orderNumber || order.id.slice(0, 12)}
+                    </p>
                   </div>
-
-                  {/* Right Section - Action Button */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/orders/${order.id}`);
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-[#172031] text-white rounded-lg hover:bg-[#232e42] transition-colors touch-manipulation active:scale-95"
-                    >
-                      View Details
-                      <ArrowRight size={18} />
-                    </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center justify-evenly">
+                    <p className="text-xs text-gray-600 font-medium">Order Status</p>
+                    <span className={`text-xs font-semibold ${getStatusTextColor(order.status)}`}>
+                      {order.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-evenly">
+                    <p className="text-xs text-gray-600 font-medium">Payment</p>
+                    <span className={`text-xs font-semibold ${getPaymentStatusTextColor(order.paymentStatus)}`}>
+                      {order.paymentStatus}
+                    </span>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
 
-        {/* Pagination */}
-        {!loading && pagination && pagination.pages > 1 && (
-          <div className="mt-8 flex justify-center gap-2">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="px-4 py-2 min-h-[44px] border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation active:scale-95"
+              {/* Order Items Summary */}
+              <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                <p className="text-xs text-gray-500 mb-2">Items ({order.items?.length || 0})</p>
+                <div className="space-y-2">
+                  {order.items && order.items.length > 0 ? (
+                    order.items.slice(0, 2).map((item) => (
+                      <div key={item.id} className="text-sm text-gray-700">
+                        <p className="font-medium truncate">{item.productName}</p>
+                        <p className="text-xs text-gray-500">
+                          Size: {item.size} | Color: {item.color} | Qty: {item.quantity}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">No items</p>
+                  )}
+                  {order.items && order.items.length > 2 && (
+                    <p className="text-xs text-gray-500 pt-2 border-t border-gray-200">
+                      +{order.items.length - 2} more item{order.items.length - 2 > 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Order Details */}
+              <div className="space-y-3 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Total Amount</span>
+                  <span className="font-bold text-gray-900">₹{parseFloat(order.totalAmount || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Payment Method</span>
+                  <span className="text-sm font-medium text-gray-900">{order.paymentMethod || 'N/A'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Order Date</span>
+                  <span className="text-sm text-gray-700">{new Date(order.createdAt).toLocaleDateString()}</span>
+                </div>
+                {order.user && (
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <span className="text-sm text-gray-600">Customer</span>
+                    <span className="text-sm font-medium text-gray-900 truncate max-w-[150px]">
+                      {order.user.name || order.user.phoneNumber || 'Guest'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-4 border-t border-gray-100 mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/orders/${order.id}`)}
+                  className="flex-1 gap-2"
+                >
+                  <Eye size={16} />
+                  View
+                </Button>
+                {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleCancel(order.id)}
+                    className="gap-2"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-600">
+            Showing {pagination.skip + 1} to {Math.min(pagination.skip + pagination.take, pagination.total)} of{' '}
+            {pagination.total} orders
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.skip === 0}
+              onClick={() =>
+                setPagination((prev) => ({
+                  ...prev,
+                  skip: Math.max(0, prev.skip - prev.take),
+                }))
+              }
             >
               Previous
-            </button>
-
-            {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`px-4 py-2 min-h-[44px] rounded-lg transition-colors touch-manipulation active:scale-95 ${currentPage === page
-                  ? 'bg-[#172031] text-white'
-                  : 'border border-gray-300 hover:bg-gray-50'
-                  }`}
-              >
-                {page}
-              </button>
-            ))}
-
-            <button
-              onClick={() => setCurrentPage(Math.min(pagination.pages, currentPage + 1))}
-              disabled={currentPage === pagination.pages}
-              className="px-4 py-2 min-h-[44px] border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation active:scale-95"
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= totalPages}
+              onClick={() =>
+                setPagination((prev) => ({
+                  ...prev,
+                  skip: prev.skip + prev.take,
+                }))
+              }
             >
               Next
-            </button>
+            </Button>
           </div>
-        )}
-      </main>
-
-      <Footer activeTab={activeTab} onTabChange={setActiveTab} />
+        </div>
+      )}
     </div>
   );
 }

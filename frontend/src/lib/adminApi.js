@@ -26,7 +26,7 @@ export const productsApi = {
     if (filters.isActive !== undefined) params.append('isActive', filters.isActive);
     if (filters.search) params.append('search', filters.search);
     if (filters.skip) params.append('skip', filters.skip);
-    if (filters.take) params.append('take', filters.take); 
+    if (filters.take) params.append('take', filters.take);
 
     const res = await authenticatedFetch(`/api/admin/products?${params}`);
     return res.json();

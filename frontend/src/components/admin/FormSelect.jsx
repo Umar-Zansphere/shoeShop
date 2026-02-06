@@ -1,38 +1,27 @@
 'use client';
 
+import CustomDropdown from './CustomDropdown';
+
 export default function FormSelect({
   label,
   error,
   options = [],
   required = false,
+  searchable = false,
   ...props
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      {label && (
-        <label className="text-sm font-semibold text-gray-700">
-          {label}
-          {required && <span className="text-red-600 ml-1">*</span>}
-        </label>
-      )}
-      <select
-        {...props}
-        className={`px-4 py-2.5 border rounded-lg focus-ring bg-white text-gray-900 transition-colors ${
-          error
-            ? 'border-red-300 focus:ring-red-500'
-            : 'border-gray-200 focus:border-red-400'
-        } ${props.className || ''}`}
-      >
-        {props.placeholder && (
-          <option value="">{props.placeholder}</option>
-        )}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-    </div>
+    <CustomDropdown
+      label={label}
+      error={error}
+      options={options}
+      required={required}
+      searchable={searchable}
+      value={props.value}
+      onChange={props.onChange}
+      placeholder={props.placeholder}
+      disabled={props.disabled}
+      className={props.className}
+    />
   );
 }

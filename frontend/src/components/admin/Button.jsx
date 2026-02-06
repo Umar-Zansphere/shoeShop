@@ -10,10 +10,10 @@ export default function Button({
   ...props
 }) {
   const variants = {
-    primary: 'bg-red-600 hover:bg-red-700 text-white',
-    secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800',
-    outline: 'border border-gray-300 hover:bg-gray-50 text-gray-700',
-    danger: 'bg-red-600/10 hover:bg-red-600/20 text-red-600',
+    primary: 'bg-primary hover:bg-primary-dark text-white shadow-sm hover:shadow-md hover:-translate-y-0.5',
+    secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-800',
+    outline: 'border-2 border-primary hover:bg-primary text-primary hover:text-white',
+    danger: 'bg-error hover:bg-red-600 text-white',
     ghost: 'hover:bg-gray-100 text-gray-700',
   };
 

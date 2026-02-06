@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser');
+const notificationService = require('./api/services/notification.service');
 
 dotenv.config();
 
@@ -17,8 +18,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(cookieParser());
 
+// Initialize web-push service
+notificationService.initializeWebPush();
+
 // Import routes
-const apiRoutes =require("./api/routes/index.js");
+const apiRoutes = require("./api/routes/index.js");
 
 // Mount API routes
 app.use("/api", apiRoutes);

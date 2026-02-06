@@ -17,17 +17,17 @@ export default function Alert({
   };
 
   const colors = {
-    info: 'bg-blue-50 border-blue-200 text-blue-800',
-    success: 'bg-green-50 border-green-200 text-green-800',
-    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    error: 'bg-red-50 border-red-200 text-red-800',
+    info: 'bg-info-light border-info/30 text-info',
+    success: 'bg-success-light border-success/30 text-success',
+    warning: 'bg-warning-light border-warning/30 text-warning',
+    error: 'bg-error-light border-error/30 text-error',
   };
 
   const iconColors = {
-    info: 'text-blue-500',
-    success: 'text-green-500',
-    warning: 'text-yellow-500',
-    error: 'text-red-500',
+    info: 'text-info',
+    success: 'text-success',
+    warning: 'text-warning',
+    error: 'text-error',
   };
 
   return (

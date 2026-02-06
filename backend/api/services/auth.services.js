@@ -5,11 +5,9 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const useragent = require('express-useragent');
 const { sendEmail } = require('../../config/email');
-const { access } = require('fs');
 
 const generateTokens = (user) => {
   const roleName = user?.role || null;
-  console.log('Generating tokens for role:', roleName);
   const accessToken = jwt.sign({ id: user.id, role: roleName }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN,
   });
@@ -190,15 +188,13 @@ const logout = async (userId, accessToken) => {
   if (!accessToken) {
     return { message: 'No session to revoke.' };
   }
-  console.log("Revoking session for user ID:", userId);
-  console.log("With access token:", accessToken);
 
   const session = await prisma.userSession.findUnique({
     where: { refreshTokenHash: accessToken }
   });
   if (session) {
     await prisma.userSession.delete({ where: { id: session.id } });
-    console.log(`Session ${session.id} revoked for user ${session.userId}`);
+
   } else {
     console.log("Logout attempted for a token that was already invalid or expired.");
   }

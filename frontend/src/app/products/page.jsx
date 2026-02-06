@@ -1,821 +1,289 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronDown, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import Header from '@/app/components/Header';
-import Sidebar from '@/app/components/Sidebar';
-import Footer from '@/app/components/Footer';
-import ProductCard from '@/app/components/ProductCard';
-import { productApi, cartApi, wishlistApi } from '@/lib/api';
-import { useToast } from '@/components/ToastContext';
-import { LoadingSkeleton } from '@/components/LoadingSkeleton';
+import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import Card from '@/components/admin/Card';
+import Button from '@/components/admin/Button';
+import FormInput from '@/components/admin/FormInput';
+import FormSelect from '@/components/admin/FormSelect';
+import Alert from '@/components/admin/Alert';
+import { productsApi } from '@/lib/adminApi';
 
 export default function ProductsPage() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const { showToast } = useToast();
-
-  // URL Parameters
-  const search = searchParams.get('search') || '';
-  const category = searchParams.get('category') || '';
-  const gender = searchParams.get('gender') || '';
-  const brand = searchParams.get('brand') || '';
-  const color = searchParams.get('color') || '';
-  const size = searchParams.get('size') || '';
-  const minPrice = searchParams.get('minPrice') || '';
-  const maxPrice = searchParams.get('maxPrice') || '';
-  const pageStr = searchParams.get('page') || '1';
-  const page = parseInt(pageStr, 10);
-
-  // UI States
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [sortBy, setSortBy] = useState('newest');
-  const [wishlist, setWishlist] = useState(new Set());
-  const [cart, setCart] = useState([]);
-  const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('products');
-
-  // Filter UI States
-  const [expandedFilters, setExpandedFilters] = useState({
-    gender: true,
-    category: true,
-    price: false,
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [alert, setAlert] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    category: '',
+    gender: '',
+    isActive: '',
+  });
+  const [pagination, setPagination] = useState({
+    skip: 0,
+    take: 12,
+    total: 0,
   });
 
-  // Data States
-  const [products, setProducts] = useState([]);
-  const [filterOptions, setFilterOptions] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [pagination, setPagination] = useState(null);
-
-  const itemsPerPage = 12;
-  const skip = (page - 1) * itemsPerPage;
-
-  // Load filter options
   useEffect(() => {
-    const loadFilters = async () => {
-      try {
-        const data = await productApi.getFilterOptions();
-        setFilterOptions(data.data || data);
-      } catch (err) {
-        console.error('Failed to load filters:', err);
-      }
-    };
-    loadFilters();
-  }, []);
+    fetchProducts();
+  }, [filters, pagination.skip]);
 
-  // Load products based on filters
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        let response;
-
-        if (search) {
-          // Advanced search
-          response = await productApi.searchProducts({
-            search,
-            category: category || undefined,
-            gender: gender || undefined,
-            brand: brand || undefined,
-            color: color || undefined,
-            size: size || undefined,
-            minPrice: minPrice || undefined,
-            maxPrice: maxPrice || undefined,
-            skip,
-            take: itemsPerPage,
-          });
-        } else if (category) {
-          response = await productApi.getProductsByCategory(category, skip, itemsPerPage);
-        } else if (gender) {
-          response = await productApi.getProductsByGender(gender, skip, itemsPerPage);
-        } else if (brand) {
-          response = await productApi.getProductsByBrand(brand, skip, itemsPerPage);
-        } else if (color) {
-          response = await productApi.getProductsByColor(color, skip, itemsPerPage);
-        } else if (size) {
-          response = await productApi.getProductsBySize(size, skip, itemsPerPage);
-        } else if (minPrice || maxPrice) {
-          response = await productApi.searchProducts({
-            minPrice: minPrice || undefined,
-            maxPrice: maxPrice || undefined,
-            skip,
-            take: itemsPerPage,
-          });
-        } else {
-          // Default: all products
-          response = await productApi.getProducts({ skip, take: itemsPerPage });
-        }
-
-        const data = response.data || response;
-        setProducts(data.products || []);
-        setPagination(data.pagination || {});
-      } catch (err) {
-        console.error('Failed to load products:', err);
-        setError('Failed to load products. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProducts();
-  }, [search, category, gender, brand, color, size, minPrice, maxPrice, page]);
-
-  const toggleWishlist = async ({ productId, variantId }) => {
-    const isCurrentlyLiked = wishlist.has(productId);
-
+  const fetchProducts = async () => {
     try {
-      if (isCurrentlyLiked) {
-        // Remove from wishlist
-        setWishlist((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(productId);
-          return newSet;
-        });
-        showToast('Removed from wishlist', 'info');
-      } else {
-        // Add to wishlist
-        const response = await wishlistApi.addToWishlist(productId, variantId);
-        setWishlist((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(productId);
-          return newSet;
-        });
-        showToast(response.toast?.message || 'Added to wishlist', 'success');
-      }
-    } catch (error) {
-      console.error('Error toggling wishlist:', error);
-      showToast('Failed to update wishlist', 'error');
-    }
-  };
-
-  const handleAddToCart = async ({ variantId, productId, price }) => {
-    try {
-      const response = await cartApi.addToCart(variantId, 1);
-
-      setCart((prev) => {
-        const existing = prev.find(item => item.variantId === variantId);
-        if (existing) {
-          return prev.map(item =>
-            item.variantId === variantId
-              ? { ...item, quantity: item.quantity + 1 }
-              : item
-          );
-        }
-        return [...prev, { variantId, productId, quantity: 1, price }];
+      setIsLoading(true);
+      const response = await productsApi.getProducts({
+        ...filters,
+        search: searchTerm || undefined,
+        skip: pagination.skip,
+        take: pagination.take,
       });
-
-      showToast(response.toast?.message || 'Added to cart', 'success');
+      setProducts(response.products || []);
+      setPagination((prev) => ({
+        ...prev,
+        total: response.pagination?.total || 0,
+      }));
     } catch (error) {
-      console.error('Error adding to cart:', error);
-      showToast('Failed to add to cart', 'error');
+      setAlert({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to load products',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const toggleFilter = (filter) => {
-    setExpandedFilters(prev => ({
+  const handleDelete = async (productId) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+
+    try {
+      await productsApi.deleteProduct(productId);
+      setAlert({
+        type: 'success',
+        title: 'Success',
+        message: 'Product deleted successfully',
+      });
+      fetchProducts();
+    } catch (error) {
+      setAlert({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to delete product',
+      });
+    }
+  };
+
+  const handleSearch = (value) => {
+    setSearchTerm(value);
+    setPagination((prev) => ({ ...prev, skip: 0 }));
+  };
+
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => ({
       ...prev,
-      [filter]: !prev[filter]
+      [field]: value,
     }));
+    setPagination((prev) => ({ ...prev, skip: 0 }));
   };
 
-  const updateFilter = (filterName, value) => {
-    const params = new URLSearchParams(searchParams);
-    if (value) {
-      params.set(filterName, value);
-    } else {
-      params.delete(filterName);
-    }
-    params.set('page', '1'); // Reset to first page
-    router.push(`/products?${params.toString()}`);
-  };
-
-  const clearAllFilters = () => {
-    router.push('/products');
-  };
-
-  const hasActiveFilters = !!(search || category || gender || brand || color || size || minPrice || maxPrice);
-
-  const pageCount = pagination?.pages || 1;
-
-  // Get page title based on filters
-  const getPageTitle = () => {
-    if (search) return `Search Results: "${search}"`;
-    if (category) return `${category.charAt(0) + category.slice(1).toLowerCase()} Shoes`;
-    if (gender) return `${gender.charAt(0) + gender.slice(1).toLowerCase()} Shoes`;
-    if (brand) return `${brand} Shoes`;
-    if (color) return `${color} Shoes`;
-    if (size) return `Size ${size}`;
-    return 'All Products';
-  };
+  const currentPage = Math.floor(pagination.skip / pagination.take) + 1;
+  const totalPages = Math.ceil(pagination.total / pagination.take);
 
   return (
-    <div className="min-h-screen bg-white">
-      <Header
-        onSidebarOpen={() => setSidebarOpen(true)}
-        onCartOpen={() => { }}
-        cart={cart}
-        user={user}
-      />
-
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        user={user}
-        onLogout={() => setUser(null)}
-        onAuthRequest={() => { }}
-      />
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Page Title */}
-        <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-[#1E293B] mb-2">
-            {getPageTitle()}
-          </h1>
-          {pagination?.total && (
-            <p className="text-gray-600">
-              Showing {pagination.total > 0 ? `${skip + 1}-${Math.min(skip + itemsPerPage, pagination.total)}` : 0} of {pagination.total} products
-            </p>
-          )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Products</h1>
+          <p className="text-gray-600 mt-1">Manage your product catalog</p>
         </div>
+        <Button
+          onClick={() => router.push('/products/new')}
+          className="gap-2"
+        >
+          <Plus size={20} />
+          Add Product
+        </Button>
+      </div>
 
-        {/* Active Filters Display */}
-        {hasActiveFilters && (
-          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200 flex items-center justify-between">
-            <div className="flex flex-wrap gap-2">
-              {search && (
-                <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  Search: {search}
-                  <button onClick={() => updateFilter('search', '')} className="hover:opacity-70">
-                    <X size={16} />
-                  </button>
-                </span>
-              )}
-              {category && (
-                <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  Category: {category}
-                  <button onClick={() => updateFilter('category', '')} className="hover:opacity-70">
-                    <X size={16} />
-                  </button>
-                </span>
-              )}
-              {gender && (
-                <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  Gender: {gender}
-                  <button onClick={() => updateFilter('gender', '')} className="hover:opacity-70">
-                    <X size={16} />
-                  </button>
-                </span>
-              )}
-              {brand && (
-                <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  Brand: {brand}
-                  <button onClick={() => updateFilter('brand', '')} className="hover:opacity-70">
-                    <X size={16} />
-                  </button>
-                </span>
-              )}
-              {color && (
-                <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  Color: {color}
-                  <button onClick={() => updateFilter('color', '')} className="hover:opacity-70">
-                    <X size={16} />
-                  </button>
-                </span>
-              )}
-              {size && (
-                <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  Size: {size}
-                  <button onClick={() => updateFilter('size', '')} className="hover:opacity-70">
-                    <X size={16} />
-                  </button>
-                </span>
-              )}
-              {minPrice && (
-                <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  Min: ₹{minPrice}
-                  <button onClick={() => updateFilter('minPrice', '')} className="hover:opacity-70">
-                    <X size={16} />
-                  </button>
-                </span>
-              )}
-              {maxPrice && (
-                <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  Max: ₹{maxPrice}
-                  <button onClick={() => updateFilter('maxPrice', '')} className="hover:opacity-70">
-                    <X size={16} />
-                  </button>
-                </span>
-              )}
-            </div>
-            <button
-              onClick={clearAllFilters}
-              className="text-blue-700 hover:text-blue-900 font-medium text-sm whitespace-nowrap ml-4"
-            >
-              Clear All
-            </button>
-          </div>
-        )}
+      {/* Alerts */}
+      {alert && (
+        <Alert
+          type={alert.type}
+          title={alert.title}
+          message={alert.message}
+          onClose={() => setAlert(null)}
+        />
+      )}
 
-        <div className="flex gap-8">
-          {/* Sidebar Filters - Desktop */}
-          <aside className="hidden lg:block w-64 shrink-0">
-            <div className="sticky top-24 space-y-6">
-              {/* Gender Filter */}
-              <div className="border rounded-lg p-4">
-                <button
-                  onClick={() => toggleFilter('gender')}
-                  className="w-full flex items-center justify-between font-semibold text-gray-900"
-                >
-                  Gender
-                  <ChevronDown
-                    size={20}
-                    className={`transition-transform ${expandedFilters.gender ? 'rotate-180' : ''}`}
+      {/* Filters */}
+      <Card>
+        <h3 className="font-semibold text-gray-900 mb-4">Filters</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <FormInput
+            placeholder="Search products..."
+            value={searchTerm}
+            onChange={(e) => handleSearch(e.target.value)}
+            icon={<Search size={18} />}
+          />
+          <FormSelect
+            placeholder="All Categories"
+            value={filters.category}
+            onChange={(e) => handleFilterChange('category', e.target.value)}
+            options={[
+              { label: 'Running', value: 'RUNNING' },
+              { label: 'Casual', value: 'CASUAL' },
+              { label: 'Formal', value: 'FORMAL' },
+              { label: 'Sneakers', value: 'SNEAKERS' },
+            ]}
+            searchable
+          />
+          <FormSelect
+            placeholder="All Genders"
+            value={filters.gender}
+            onChange={(e) => handleFilterChange('gender', e.target.value)}
+            options={[
+              { label: 'Men', value: 'MEN' },
+              { label: 'Women', value: 'WOMEN' },
+              { label: 'Unisex', value: 'UNISEX' },
+              { label: 'Kids', value: 'KIDS' },
+            ]}
+            searchable
+          />
+          <FormSelect
+            placeholder="All Status"
+            value={filters.isActive}
+            onChange={(e) => handleFilterChange('isActive', e.target.value)}
+            options={[
+              { label: 'Active', value: 'true' },
+              { label: 'Inactive', value: 'false' },
+            ]}
+          />
+        </div>
+      </Card>
+
+      {/* Products Grid */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="h-64 animate-pulse">
+              <div className="h-full bg-gray-100 rounded"></div>
+            </Card>
+          ))}
+        </div>
+      ) : products.length === 0 ? (
+        <Card className="text-center py-12">
+          <Package size={48} className="mx-auto text-gray-400 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No products found</h3>
+          <p className="text-gray-600">Try adjusting your filters or add a new product</p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {products.map((product) => (
+            <Card key={product.id} hover className="flex flex-col">
+              {/* Product Image */}
+              <div className="aspect-square bg-gray-100 rounded-lg mb-4 overflow-hidden">
+                {product.variants && product.variants.length > 0 && product.variants[0].images && product.variants[0].images.length > 0 ? (
+                  <img
+                    src={product.variants[0].images[0].url}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
                   />
-                </button>
-                {expandedFilters.gender && (
-                  <div className="mt-4 space-y-2">
-                    {['MEN', 'WOMEN', 'UNISEX', 'KIDS'].map((genderOption) => (
-                      <label key={genderOption} className="flex items-center gap-3 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="gender"
-                          value={genderOption}
-                          checked={gender === genderOption}
-                          onChange={() => updateFilter('gender', genderOption)}
-                          className="w-4 h-4"
-                        />
-                        <span className="text-gray-700">{genderOption.charAt(0) + genderOption.slice(1).toLowerCase()}</span>
-                      </label>
-                    ))}
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Package size={48} className="text-gray-400" />
                   </div>
                 )}
               </div>
 
-              {/* Category Filter */}
-              <div className="border rounded-lg p-4">
-                <button
-                  onClick={() => toggleFilter('category')}
-                  className="w-full flex items-center justify-between font-semibold text-gray-900"
-                >
-                  Category
-                  <ChevronDown
-                    size={20}
-                    className={`transition-transform ${expandedFilters.category ? 'rotate-180' : ''}`}
-                  />
-                </button>
-                {expandedFilters.category && (
-                  <div className="mt-4 space-y-2">
-                    {['RUNNING', 'CASUAL', 'FORMAL', 'SNEAKERS'].map((categoryOption) => (
-                      <label key={categoryOption} className="flex items-center gap-3 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="category"
-                          value={categoryOption}
-                          checked={category === categoryOption}
-                          onChange={() => updateFilter('category', categoryOption)}
-                          className="w-4 h-4"
-                        />
-                        <span className="text-gray-700">{categoryOption.charAt(0) + categoryOption.slice(1).toLowerCase()}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Brand Filter */}
-              {filterOptions?.brands && filterOptions.brands.length > 0 && (
-                <div className="border rounded-lg p-4">
-                  <button
-                    onClick={() => toggleFilter('brand')}
-                    className="w-full flex items-center justify-between font-semibold text-gray-900"
+              {/* Product Info */}
+              <div className="flex-1">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <h3 className="font-semibold text-gray-900 line-clamp-2">
+                    {product.name}
+                  </h3>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${product.isActive
+                        ? 'bg-success-light text-success'
+                        : 'bg-gray-100 text-gray-700'
+                      }`}
                   >
-                    Brand
-                    <ChevronDown
-                      size={20}
-                      className={`transition-transform ${expandedFilters.brand ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  {expandedFilters.brand && (
-                    <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
-                      {filterOptions.brands.map((brandOption) => (
-                        <label key={brandOption} className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="brand"
-                            value={brandOption}
-                            checked={brand === brandOption}
-                            onChange={() => updateFilter('brand', brandOption)}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-gray-700">{brandOption}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Color Filter */}
-              {filterOptions?.colors && filterOptions.colors.length > 0 && (
-                <div className="border rounded-lg p-4">
-                  <button
-                    onClick={() => toggleFilter('color')}
-                    className="w-full flex items-center justify-between font-semibold text-gray-900"
-                  >
-                    Color
-                    <ChevronDown
-                      size={20}
-                      className={`transition-transform ${expandedFilters.color ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  {expandedFilters.color && (
-                    <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
-                      {filterOptions.colors.map((colorOption) => (
-                        <label key={colorOption} className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            value={colorOption}
-                            checked={color === colorOption}
-                            onChange={() => updateFilter('color', color === colorOption ? '' : colorOption)}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-gray-700">{colorOption}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Size Filter */}
-              {filterOptions?.sizes && filterOptions.sizes.length > 0 && (
-                <div className="border rounded-lg p-4">
-                  <button
-                    onClick={() => toggleFilter('size')}
-                    className="w-full flex items-center justify-between font-semibold text-gray-900"
-                  >
-                    Size
-                    <ChevronDown
-                      size={20}
-                      className={`transition-transform ${expandedFilters.size ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  {expandedFilters.size && (
-                    <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
-                      {filterOptions.sizes.map((sizeOption) => (
-                        <label key={sizeOption} className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            value={sizeOption}
-                            checked={size === sizeOption}
-                            onChange={() => updateFilter('size', size === sizeOption ? '' : sizeOption)}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-gray-700">{sizeOption}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </aside>
-
-          {/* Mobile Filters Modal */}
-          {mobileFiltersOpen && (
-            <div className="fixed inset-0 z-50 lg:hidden">
-              {/* Backdrop */}
-              <div
-                className="absolute inset-0 bg-black/50"
-                onClick={() => setMobileFiltersOpen(false)}
-              />
-              {/* Modal */}
-              <div className="absolute inset-y-0 left-0 w-80 bg-white overflow-y-auto shadow-xl">
-                <div className="p-4 border-b flex items-center justify-between sticky top-0 bg-white">
-                  <h2 className="text-lg font-bold">Filters</h2>
-                  <button
-                    onClick={() => setMobileFiltersOpen(false)}
-                    className="p-1 hover:bg-gray-100 rounded"
-                  >
-                    <X size={24} />
-                  </button>
+                    {product.isActive ? 'Active' : 'Inactive'}
+                  </span>
                 </div>
 
-                <div className="p-4 space-y-6">
-                  {/* Gender Filter */}
-                  <div className="border rounded-lg p-4">
-                    <button
-                      onClick={() => toggleFilter('gender')}
-                      className="w-full flex items-center justify-between font-semibold text-gray-900"
-                    >
-                      Gender
-                      <ChevronDown
-                        size={20}
-                        className={`transition-transform ${expandedFilters.gender ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                    {expandedFilters.gender && (
-                      <div className="mt-4 space-y-2">
-                        {['MEN', 'WOMEN', 'UNISEX', 'KIDS'].map((genderOption) => (
-                          <label key={genderOption} className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="gender"
-                              value={genderOption}
-                              checked={gender === genderOption}
-                              onChange={() => {
-                                updateFilter('gender', genderOption);
-                                setMobileFiltersOpen(false);
-                              }}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-gray-700">{genderOption.charAt(0) + genderOption.slice(1).toLowerCase()}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Category Filter */}
-                  <div className="border rounded-lg p-4">
-                    <button
-                      onClick={() => toggleFilter('category')}
-                      className="w-full flex items-center justify-between font-semibold text-gray-900"
-                    >
-                      Category
-                      <ChevronDown
-                        size={20}
-                        className={`transition-transform ${expandedFilters.category ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                    {expandedFilters.category && (
-                      <div className="mt-4 space-y-2">
-                        {['RUNNING', 'CASUAL', 'FORMAL', 'SNEAKERS'].map((categoryOption) => (
-                          <label key={categoryOption} className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="category"
-                              value={categoryOption}
-                              checked={category === categoryOption}
-                              onChange={() => {
-                                updateFilter('category', categoryOption);
-                                setMobileFiltersOpen(false);
-                              }}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-gray-700">{categoryOption.charAt(0) + categoryOption.slice(1).toLowerCase()}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Brand Filter */}
-                  {filterOptions?.brands && filterOptions.brands.length > 0 && (
-                    <div className="border rounded-lg p-4">
-                      <button
-                        onClick={() => toggleFilter('brand')}
-                        className="w-full flex items-center justify-between font-semibold text-gray-900"
-                      >
-                        Brand
-                        <ChevronDown
-                          size={20}
-                          className={`transition-transform ${expandedFilters.brand ? 'rotate-180' : ''}`}
-                        />
-                      </button>
-                      {expandedFilters.brand && (
-                        <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
-                          {filterOptions.brands.map((brandOption) => (
-                            <label key={brandOption} className="flex items-center gap-3 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="brand"
-                                value={brandOption}
-                                checked={brand === brandOption}
-                                onChange={() => {
-                                  updateFilter('brand', brandOption);
-                                  setMobileFiltersOpen(false);
-                                }}
-                                className="w-4 h-4"
-                              />
-                              <span className="text-gray-700">{brandOption}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Color Filter */}
-                  {filterOptions?.colors && filterOptions.colors.length > 0 && (
-                    <div className="border rounded-lg p-4">
-                      <button
-                        onClick={() => toggleFilter('color')}
-                        className="w-full flex items-center justify-between font-semibold text-gray-900"
-                      >
-                        Color
-                        <ChevronDown
-                          size={20}
-                          className={`transition-transform ${expandedFilters.color ? 'rotate-180' : ''}`}
-                        />
-                      </button>
-                      {expandedFilters.color && (
-                        <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
-                          {filterOptions.colors.map((colorOption) => (
-                            <label key={colorOption} className="flex items-center gap-3 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                value={colorOption}
-                                checked={color === colorOption}
-                                onChange={() => updateFilter('color', color === colorOption ? '' : colorOption)}
-                                className="w-4 h-4"
-                              />
-                              <span className="text-gray-700">{colorOption}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Size Filter */}
-                  {filterOptions?.sizes && filterOptions.sizes.length > 0 && (
-                    <div className="border rounded-lg p-4">
-                      <button
-                        onClick={() => toggleFilter('size')}
-                        className="w-full flex items-center justify-between font-semibold text-gray-900"
-                      >
-                        Size
-                        <ChevronDown
-                          size={20}
-                          className={`transition-transform ${expandedFilters.size ? 'rotate-180' : ''}`}
-                        />
-                      </button>
-                      {expandedFilters.size && (
-                        <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
-                          {filterOptions.sizes.map((sizeOption) => (
-                            <label key={sizeOption} className="flex items-center gap-3 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                value={sizeOption}
-                                checked={size === sizeOption}
-                                onChange={() => updateFilter('size', size === sizeOption ? '' : sizeOption)}
-                                className="w-4 h-4"
-                              />
-                              <span className="text-gray-700">{sizeOption}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Close Button */}
-                  <button
-                    onClick={() => setMobileFiltersOpen(false)}
-                    className="w-full py-3 bg-[#FF6B6B] text-white font-semibold rounded-lg hover:bg-[#FF5252]"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Products Grid */}
-          <div className="flex-1">
-            {/* Top Bar */}
-            <div className="flex items-center justify-between mb-6">
-              <button
-                onClick={() => setMobileFiltersOpen(true)}
-                className="lg:hidden flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                <Filter size={20} />
-                Filters
-              </button>
-
-              <div className="ml-auto">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B6B]"
-                >
-                  <option value="newest">Newest</option>
-                  <option value="price-low">Price: Low to High</option>
-                  <option value="price-high">Price: High to Low</option>
-                  <option value="popular">Most Popular</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Loading State */}
-            {loading ? (
-              <LoadingSkeleton />
-            ) : error ? (
-              <div className="text-center py-12">
-                <p className="text-red-600 mb-4">{error}</p>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="px-6 py-2 bg-[#FF6B6B] text-white rounded-lg hover:bg-[#FF5252]"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : products.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-600 text-lg mb-4">
-                  {hasActiveFilters ? 'No products found matching your filters.' : 'No products available.'}
+                <p className="text-sm text-gray-600 mb-1">{product.category}</p>
+                <p className="text-sm text-gray-600 capitalize mb-3">{product.gender}</p>
+                <p className="text-xl font-bold text-gray-900 mb-4">
+                  ₹{product.variants && product.variants.length > 0 ? Math.min(...product.variants.map(v => parseFloat(v.price) || 0)) : 0}
                 </p>
-                {hasActiveFilters && (
-                  <button
-                    onClick={clearAllFilters}
-                    className="px-6 py-2 bg-[#FF6B6B] text-white rounded-lg hover:bg-[#FF5252]"
-                  >
-                    Clear Filters
-                  </button>
-                )}
               </div>
-            ) : (
-              <>
-                {/* Products Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                  {products.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      isLiked={wishlist.has(product.id)}
-                      onToggleLike={() => toggleWishlist(product.id)}
-                      onAddToCart={() =>
-                        handleAddToCart({
-                          variantId: product.variants?.[0]?.id,
-                          productId: product.id,
-                          price: product.price,
-                        })
-                      }
-                    />
-                  ))}
-                </div>
 
-                {/* Pagination */}
-                {pageCount > 1 && (
-                  <div className="flex items-center justify-center gap-2 py-8 border-t">
-                    <button
-                      onClick={() => {
-                        const params = new URLSearchParams(searchParams);
-                        params.set('page', Math.max(1, page - 1).toString());
-                        router.push(`/products?${params.toString()}`);
-                      }}
-                      disabled={page === 1}
-                      className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ChevronLeft size={20} />
-                    </button>
+              {/* Actions */}
+              <div className="flex gap-2 pt-4 border-t border-gray-100">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/products/${product.id}`)}
+                  className="flex-1 gap-2"
+                >
+                  <Edit2 size={16} />
+                  Edit
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => handleDelete(product.id)}
+                  className="gap-2"
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
-                    <div className="flex gap-1">
-                      {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => (
-                        <button
-                          key={p}
-                          onClick={() => {
-                            const params = new URLSearchParams(searchParams);
-                            params.set('page', p.toString());
-                            router.push(`/products?${params.toString()}`);
-                          }}
-                          className={`w-10 h-10 rounded-lg border ${page === p
-                              ? 'bg-[#FF6B6B] text-white border-[#FF6B6B]'
-                              : 'border-gray-300 hover:bg-gray-50'
-                            }`}
-                        >
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        const params = new URLSearchParams(searchParams);
-                        params.set('page', Math.min(pageCount, page + 1).toString());
-                        router.push(`/products?${params.toString()}`);
-                      }}
-                      disabled={page === pageCount}
-                      className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ChevronRight size={20} />
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-600">
+            Showing {pagination.skip + 1} to {Math.min(pagination.skip + pagination.take, pagination.total)} of{' '}
+            {pagination.total} products
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.skip === 0}
+              onClick={() =>
+                setPagination((prev) => ({
+                  ...prev,
+                  skip: Math.max(0, prev.skip - prev.take),
+                }))
+              }
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= totalPages}
+              onClick={() =>
+                setPagination((prev) => ({
+                  ...prev,
+                  skip: prev.skip + prev.take,
+                }))
+              }
+            >
+              Next
+            </Button>
           </div>
         </div>
-      </main>
-
-      <Footer activeTab={activeTab} onTabChange={setActiveTab} />
+      )}
     </div>
   );
 }
