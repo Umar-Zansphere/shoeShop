@@ -84,7 +84,7 @@ export default function AdminLayout({ children }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#FF6B6B" />
         <meta name="description" content="SoleMate - Discover premium shoes with exclusive collections" />
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
         <link rel="icon" href="/icons/manifest-icon-192.maskable.png" />
         <link rel="apple-touch-icon" href="/icons/manifest-icon-192.maskable.png" />
         <title>SoleMate Admin</title>

@@ -8,6 +8,7 @@
   "background_color": "#FAFAF8",
   "theme_color": "#FF6B6B",
   "orientation": "portrait-primary",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
   "icons": [
     {
       "src": "/icons/manifest-icon-192.maskable.png",
@@ -34,5 +35,21 @@
       "purpose": "maskable"
     }
   ],
-  "categories": ["business", "productivity"]
+  "categories": ["business", "productivity"],
+  "screenshots": [
+    {
+      "src": "/icons/manifest-icon-512.maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/manifest-icon-512.maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "purpose": "any"
+    }
+  ]
 }
