@@ -5,7 +5,7 @@ import { ArrowLeft, Heart, Star, ShoppingCart, ChevronLeft, ChevronRight, Truck,
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { productApi, cartApi, wishlistApi, storageApi } from '@/lib/api';
-import RelatedProducts from '@/app/components/RelatedProducts';
+// import RelatedProducts from '@/app/components/RelatedProducts';
 
 export default function ProductDetailsPage() {
   const params = useParams();
@@ -448,12 +448,12 @@ export default function ProductDetailsPage() {
         </div>
 
         {/* Related Products */}
-        {product.variants && product.variants.length > 0 && (
+        {/* {product.variants && product.variants.length > 0 && (
           <div>
             <h2 className="text-2xl font-bold text-[#1E293B] mb-8">You Might Also Like</h2>
             <RelatedProducts products={[]} />
           </div>
-        )}
+        )} */}
       </main>
     </div>
   );

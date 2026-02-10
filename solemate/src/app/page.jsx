@@ -187,8 +187,6 @@ export default function Home() {
           </div>
         )}
       </main>
-
-      {/* <Footer activeTab={activeTab} onTabChange={setActiveTab} /> */}
     </div>
   );
 }

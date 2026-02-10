@@ -3,28 +3,32 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/app/components/Header';
-import Footer from '@/app/components/Footer';
 import { productApi } from '@/lib/api';
-import { ArrowRight, Zap, TrendingUp, Award } from 'lucide-react';
+import { ArrowRight, Zap, TrendingUp, Award, Sparkles } from 'lucide-react';
 
 export default function ExplorePage() {
   const router = useRouter();
   const [filterOptions, setFilterOptions] = useState(null);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('explore');
 
   useEffect(() => {
-    const loadFilters = async () => {
+    const loadData = async () => {
       try {
-        const data = await productApi.getFilterOptions();
-        setFilterOptions(data.data || data);
+        const [filtersData, productsData] = await Promise.all([
+          productApi.getFilterOptions(),
+          productApi.getPopularProducts({ take: 8 })
+        ]);
+        setFilterOptions(filtersData.data || filtersData);
+        const prods = Array.isArray(productsData) ? productsData : (productsData.data || []);
+        setFeaturedProducts(prods);
       } catch (err) {
-        console.error('Failed to load filter options:', err);
+        console.error('Failed to load data:', err);
       } finally {
         setLoading(false);
       }
     };
-    loadFilters();
+    loadData();
   }, []);
 
   const categories = [
@@ -34,25 +38,6 @@ export default function ExplorePage() {
     { name: 'Sneakers', icon: '✨', color: 'from-pink-500 to-pink-600' },
   ];
 
-  const genders = [
-    { name: 'Men', icon: '👨' },
-    { name: 'Women', icon: '👩' },
-    { name: 'Kids', icon: '👧' },
-    { name: 'Unisex', icon: '👥' },
-  ];
-
-  const handleCategoryClick = (categoryName) => {
-    router.push(`/products?category=${categoryName.toUpperCase()}`);
-  };
-
-  const handleGenderClick = (genderName) => {
-    router.push(`/products?gender=${genderName.toUpperCase()}`);
-  };
-
-  const handleBrandClick = (brandName) => {
-    router.push(`/products?brand=${brandName}`);
-  };
-
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
@@ -60,7 +45,7 @@ export default function ExplorePage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
         {/* Hero Section */}
         <div className="mb-16">
-          <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-slate-900 via-slate-800 to-slate-900 p-8 sm:p-12">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-8 sm:p-12">
             <div className="absolute inset-0 opacity-10">
               <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500 rounded-full blur-3xl -mr-48 -mt-48" />
             </div>
@@ -69,7 +54,7 @@ export default function ExplorePage() {
                 Discover Your Perfect Shoe
               </h1>
               <p className="text-lg text-slate-300 mb-8 max-w-2xl">
-                Explore our curated collection of premium footwear. Find your style with thousands of options across multiple brands and categories.
+                Explore thousands of premium footwear options. Find your style across multiple brands, categories, and collections.
               </p>
               <button
                 onClick={() => router.push('/products')}
@@ -89,14 +74,14 @@ export default function ExplorePage() {
               <TrendingUp size={32} className="text-blue-600" />
             </div>
             <h3 className="text-2xl font-black text-slate-900 mb-2">10K+</h3>
-            <p className="text-slate-600">Products in stock</p>
+            <p className="text-slate-600">Products available</p>
           </div>
           <div className="bg-white rounded-3xl p-8 border border-slate-100 text-center">
             <div className="inline-block p-3 bg-orange-100 rounded-2xl mb-4">
               <Award size={32} className="text-orange-600" />
             </div>
             <h3 className="text-2xl font-black text-slate-900 mb-2">50+</h3>
-            <p className="text-slate-600">Premium brands</p>
+            <p className="text-slate-600">Top brands</p>
           </div>
           <div className="bg-white rounded-3xl p-8 border border-slate-100 text-center">
             <div className="inline-block p-3 bg-green-100 rounded-2xl mb-4">
@@ -124,8 +109,8 @@ export default function ExplorePage() {
             {categories.map((category) => (
               <button
                 key={category.name}
-                onClick={() => handleCategoryClick(category.name)}
-                className={`group relative overflow-hidden rounded-3xl p-8 text-white font-bold text-lg transition-transform hover:scale-105 bg-linear-to-br ${category.color} shadow-lg`}
+                onClick={() => router.push(`/products?category=${category.name.toUpperCase()}`)}
+                className={`group relative overflow-hidden rounded-3xl p-8 text-white font-bold text-lg transition-transform hover:scale-105 bg-gradient-to-br ${category.color} shadow-lg`}
               >
                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors" />
                 <div className="relative z-10 flex flex-col items-center gap-3">
@@ -138,42 +123,11 @@ export default function ExplorePage() {
           </div>
         </div>
 
-        {/* Gender Section */}
-        <div className="mb-16">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-black text-slate-900">Shop by Gender</h2>
-            <button
-              onClick={() => router.push('/products')}
-              className="text-orange-600 hover:text-orange-700 font-bold flex items-center gap-2 transition-colors"
-            >
-              View All
-              <ArrowRight size={20} />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {genders.map((gender) => (
-              <button
-                key={gender.name}
-                onClick={() => handleGenderClick(gender.name)}
-                className="group bg-white rounded-3xl p-8 border-2 border-slate-200 hover:border-orange-500 hover:shadow-lg transition-all text-center"
-              >
-                <div className="text-5xl mb-4">{gender.icon}</div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">{gender.name}</h3>
-                <div className="flex items-center justify-center gap-2 text-orange-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
-                  Shop
-                  <ArrowRight size={18} />
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Brands Section */}
+        {/* Brands Spotlight */}
         {filterOptions?.brands && filterOptions.brands.length > 0 && (
           <div className="mb-16">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-3xl font-black text-slate-900">Shop by Brand</h2>
+              <h2 className="text-3xl font-black text-slate-900">Popular Brands</h2>
               <button
                 onClick={() => router.push('/products')}
                 className="text-orange-600 hover:text-orange-700 font-bold flex items-center gap-2 transition-colors"
@@ -187,7 +141,7 @@ export default function ExplorePage() {
               {filterOptions.brands.slice(0, 8).map((brand) => (
                 <button
                   key={brand}
-                  onClick={() => handleBrandClick(brand)}
+                  onClick={() => router.push(`/products?brand=${encodeURIComponent(brand)}`)}
                   className="bg-white rounded-2xl p-6 border-2 border-slate-200 hover:border-orange-500 hover:shadow-lg transition-all text-center group"
                 >
                   <h3 className="font-bold text-slate-900 group-hover:text-orange-600 transition-colors">
@@ -197,60 +151,23 @@ export default function ExplorePage() {
                 </button>
               ))}
             </div>
-
-            {filterOptions.brands.length > 8 && (
-              <div className="mt-8 text-center">
-                <button
-                  onClick={() => router.push('/products')}
-                  className="px-8 py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-2xl transition-colors inline-flex items-center gap-2"
-                >
-                  See All {filterOptions.brands.length} Brands
-                  <ArrowRight size={20} />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Colors Section */}
-        {filterOptions?.colors && filterOptions.colors.length > 0 && (
-          <div className="mb-16">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-3xl font-black text-slate-900">Shop by Color</h2>
-              <button
-                onClick={() => router.push('/products')}
-                className="text-orange-600 hover:text-orange-700 font-bold flex items-center gap-2 transition-colors"
-              >
-                View All
-                <ArrowRight size={20} />
-              </button>
-            </div>
-
-            <div className="flex flex-wrap gap-4">
-              {filterOptions.colors.slice(0, 12).map((color) => (
-                <button
-                  key={color}
-                  onClick={() => router.push(`/products?color=${color}`)}
-                  className="px-6 py-3 bg-white rounded-2xl border-2 border-slate-200 hover:border-orange-500 hover:shadow-lg transition-all font-semibold text-slate-900 hover:text-orange-600"
-                >
-                  {color}
-                </button>
-              ))}
-            </div>
           </div>
         )}
 
         {/* CTA Section */}
-        <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-orange-500 to-orange-600 p-8 sm:p-12 text-center">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 to-orange-600 p-8 sm:p-12 text-center">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl -mr-48 -mt-48" />
           </div>
           <div className="relative z-10">
+            <div className="flex justify-center mb-4">
+              <Sparkles size={40} className="text-white" />
+            </div>
             <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
               Ready to Find Your Perfect Shoe?
             </h2>
             <p className="text-lg text-orange-100 mb-8 max-w-2xl mx-auto">
-              Browse our complete collection and discover the shoe that matches your style.
+              Explore our complete collection with advanced filters, search, and sorting options to find exactly what you're looking for.
             </p>
             <button
               onClick={() => router.push('/products')}
@@ -262,8 +179,6 @@ export default function ExplorePage() {
           </div>
         </div>
       </main>
-
-      <Footer activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }

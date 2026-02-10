@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircle, Package, Truck, Mail, Home } from 'lucide-react';
 import Header from '@/app/components/Header';
-import Footer from '@/app/components/Footer';
 
 export default function OrderConfirmationPage() {
   const router = useRouter();
@@ -36,7 +35,6 @@ export default function OrderConfirmationPage() {
             <div className="w-12 h-12 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin mx-auto"></div>
           </div>
         </div>
-        <Footer activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
     );
   }
@@ -56,7 +54,6 @@ export default function OrderConfirmationPage() {
             </button>
           </div>
         </main>
-        <Footer activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
     );
   }
@@ -175,12 +172,12 @@ export default function OrderConfirmationPage() {
           >
             Continue Shopping
           </button>
-          <button
+          {/* <button
             onClick={() => router.push('/orders')}
             className="px-6 py-4 min-h-11 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition-colors font-bold shadow-md hover:shadow-lg touch-manipulation active:scale-95"
           >
             View All Orders
-          </button>
+          </button> */}
         </div>
 
         {/* Support Info */}
@@ -206,8 +203,6 @@ export default function OrderConfirmationPage() {
           </div>
         </div>
       </main>
-
-      <Footer activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }

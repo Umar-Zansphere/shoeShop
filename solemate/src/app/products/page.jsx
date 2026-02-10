@@ -1,289 +1,557 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import Card from '@/components/admin/Card';
-import Button from '@/components/admin/Button';
-import FormInput from '@/components/admin/FormInput';
-import FormSelect from '@/components/admin/FormSelect';
-import Alert from '@/components/admin/Alert';
-import { productsApi } from '@/lib/adminApi';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Search, ChevronDown, X, Package } from 'lucide-react';
+import Header from '@/app/components/Header';
+import ProductCard from '@/app/components/ProductCard';
+import { productApi, cartApi, wishlistApi } from '@/lib/api';
 
 export default function ProductsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [products, setProducts] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [alert, setAlert] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filterOptions, setFilterOptions] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [wishlist, setWishlist] = useState([]);
+  const [user, setUser] = useState(null);
+
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [filters, setFilters] = useState({
-    category: '',
-    gender: '',
-    isActive: '',
+    category: searchParams.get('category') || '',
+    gender: searchParams.get('gender') || '',
+    brand: searchParams.get('brand') || '',
+    color: searchParams.get('color') || '',
+    size: searchParams.get('size') || '',
+    minPrice: searchParams.get('minPrice') || '',
+    maxPrice: searchParams.get('maxPrice') || '',
   });
-  const [pagination, setPagination] = useState({
-    skip: 0,
-    take: 12,
-    total: 0,
-  });
+  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'popular');
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1'));
 
+  // Pagination
+  const itemsPerPage = 12;
+
+  // Load filters and products
   useEffect(() => {
-    fetchProducts();
-  }, [filters, pagination.skip]);
+    loadFilterOptions();
+    loadProducts();
+    loadWishlist();
+  }, [filters, searchTerm, sortBy, currentPage]);
 
-  const fetchProducts = async () => {
+  const loadFilterOptions = useCallback(async () => {
     try {
-      setIsLoading(true);
-      const response = await productsApi.getProducts({
-        ...filters,
-        search: searchTerm || undefined,
-        skip: pagination.skip,
-        take: pagination.take,
-      });
-      setProducts(response.products || []);
-      setPagination((prev) => ({
-        ...prev,
-        total: response.pagination?.total || 0,
-      }));
-    } catch (error) {
-      setAlert({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to load products',
-      });
+      const data = await productApi.getFilterOptions();
+      setFilterOptions(data.data || data);
+    } catch (err) {
+      console.error('Failed to load filter options:', err);
+    }
+  }, []);
+
+  const loadProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params = {
+        skip: (currentPage - 1) * itemsPerPage,
+        take: itemsPerPage,
+      };
+
+      if (searchTerm) params.search = searchTerm;
+      if (filters.category) params.category = filters.category;
+      if (filters.gender) params.gender = filters.gender;
+      if (filters.brand) params.brand = filters.brand;
+      if (filters.color) params.color = filters.color;
+      if (filters.size) params.size = filters.size;
+      if (filters.minPrice) params.minPrice = filters.minPrice;
+      if (filters.maxPrice) params.maxPrice = filters.maxPrice;
+
+      let data;
+      if (searchTerm) {
+        data = await productApi.searchProducts(params);
+      } else if (filters.category) {
+        data = await productApi.getProductsByCategory(filters.category, params);
+      } else if (filters.gender) {
+        data = await productApi.getProductsByGender(filters.gender, params);
+      } else if (filters.brand) {
+        data = await productApi.getProductsByBrand(filters.brand, params);
+      } else if (filters.color) {
+        data = await productApi.getProductsByColor(filters.color, params);
+      } else if (filters.size) {
+        data = await productApi.getProductsBySize(filters.size, params);
+      } else {
+        data = await productApi.getProducts(params);
+      }
+
+      let productsData = Array.isArray(data)
+        ? data
+        : (data?.data?.products || data?.products || data?.data || []);
+
+      // Sort products
+      if (sortBy === 'price-low') {
+        productsData = productsData.sort((a, b) => {
+          const priceA = a.variants?.[0]?.price || a.price || 0;
+          const priceB = b.variants?.[0]?.price || b.price || 0;
+          return priceA - priceB;
+        });
+      } else if (sortBy === 'price-high') {
+        productsData = productsData.sort((a, b) => {
+          const priceA = a.variants?.[0]?.price || a.price || 0;
+          const priceB = b.variants?.[0]?.price || b.price || 0;
+          return priceB - priceA;
+        });
+      } else if (sortBy === 'newest') {
+        productsData = productsData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }
+
+      setProducts(productsData);
+    } catch (err) {
+      console.error('Failed to load products:', err);
+      setProducts([]);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  }, [filters, searchTerm, sortBy, currentPage]);
 
-  const handleDelete = async (productId) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
-
+  const loadWishlist = useCallback(async () => {
     try {
-      await productsApi.deleteProduct(productId);
-      setAlert({
-        type: 'success',
-        title: 'Success',
-        message: 'Product deleted successfully',
-      });
-      fetchProducts();
-    } catch (error) {
-      setAlert({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to delete product',
-      });
+      // Try to fetch from API first (uses cookies)
+      try {
+        const data = await wishlistApi.getWishlist();
+        const items = data.items || [];
+        setWishlist(items.map(item => `${item.productId}-${item.variantId}`));
+        return;
+      } catch (apiError) {
+        // If API fails (user not authenticated), fall back to localStorage
+        const items = storageApi.getWishlist();
+        setWishlist(items.map(item => `${item.productId}-${item.variantId}`));
+      }
+    } catch (err) {
+      console.error('Failed to load wishlist:', err);
     }
-  };
-
-  const handleSearch = (value) => {
-    setSearchTerm(value);
-    setPagination((prev) => ({ ...prev, skip: 0 }));
-  };
+  }, []);
 
   const handleFilterChange = (field, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-    setPagination((prev) => ({ ...prev, skip: 0 }));
+    setFilters(prev => ({ ...prev, [field]: value }));
+    setCurrentPage(1);
+    updateUrl();
   };
 
-  const currentPage = Math.floor(pagination.skip / pagination.take) + 1;
-  const totalPages = Math.ceil(pagination.total / pagination.take);
+  const handleRemoveFilter = (field) => {
+    setFilters(prev => ({ ...prev, [field]: '' }));
+    setCurrentPage(1);
+    updateUrl();
+  };
+
+  const updateUrl = () => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    if (searchTerm) params.set('search', searchTerm);
+    if (sortBy !== 'popular') params.set('sort', sortBy);
+    if (currentPage > 1) params.set('page', currentPage);
+
+    router.push(`/products?${params.toString()}`);
+  };
+
+  const handleAddToCart = async (item) => {
+    try {
+      // Try API first (uses cookies)
+      try {
+        await cartApi.addToCart(item.variantId, item.quantity);
+      } catch (apiError) {
+        // If API fails (user not authenticated), use localStorage
+        storageApi.addToCart({
+          id: `${item.productId}-${item.variantId}`,
+          variantId: item.variantId,
+          quantity: item.quantity,
+          price: item.price,
+        });
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+    }
+  };
+
+  const handleToggleWishlist = async (item) => {
+    try {
+      const itemKey = `${item.productId}-${item.variantId}`;
+
+      if (wishlist.includes(itemKey)) {
+        // Remove from wishlist
+        try {
+          const wishlistItem = (await wishlistApi.getWishlist()).items?.find(
+            w => w.productId === item.productId && w.variantId === item.variantId
+          );
+          if (wishlistItem) {
+            await wishlistApi.removeFromWishlist(wishlistItem.id);
+          }
+        } catch (apiError) {
+          // If API fails, just remove from localStorage
+          storageApi.removeFromWishlist(itemKey);
+        }
+        setWishlist(prev => prev.filter(id => id !== itemKey));
+      } else {
+        // Add to wishlist
+        try {
+          await wishlistApi.addToWishlist(item.productId, item.variantId);
+        } catch (apiError) {
+          // If API fails, add to localStorage
+          storageApi.addToWishlist({
+            productId: item.productId,
+            variantId: item.variantId,
+          });
+        }
+        setWishlist(prev => [...prev, itemKey]);
+      }
+    } catch (error) {
+      console.error('Error toggling wishlist:', error);
+    }
+  };
+
+  const activeFilters = Object.entries(filters).filter(([_, value]) => value);
+  const hasActiveFilters = activeFilters.length > 0 || searchTerm;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-          <p className="text-gray-600 mt-1">Manage your product catalog</p>
-        </div>
-        <Button
-          onClick={() => router.push('/products/new')}
-          className="gap-2"
-        >
-          <Plus size={20} />
-          Add Product
-        </Button>
-      </div>
+    <div className="min-h-screen bg-slate-50">
+      <Header />
 
-      {/* Alerts */}
-      {alert && (
-        <Alert
-          type={alert.type}
-          title={alert.title}
-          message={alert.message}
-          onClose={() => setAlert(null)}
-        />
-      )}
-
-      {/* Filters */}
-      <Card>
-        <h3 className="font-semibold text-gray-900 mb-4">Filters</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <FormInput
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-            icon={<Search size={18} />}
-          />
-          <FormSelect
-            placeholder="All Categories"
-            value={filters.category}
-            onChange={(e) => handleFilterChange('category', e.target.value)}
-            options={[
-              { label: 'Running', value: 'RUNNING' },
-              { label: 'Casual', value: 'CASUAL' },
-              { label: 'Formal', value: 'FORMAL' },
-              { label: 'Sneakers', value: 'SNEAKERS' },
-            ]}
-            searchable
-          />
-          <FormSelect
-            placeholder="All Genders"
-            value={filters.gender}
-            onChange={(e) => handleFilterChange('gender', e.target.value)}
-            options={[
-              { label: 'Men', value: 'MEN' },
-              { label: 'Women', value: 'WOMEN' },
-              { label: 'Unisex', value: 'UNISEX' },
-              { label: 'Kids', value: 'KIDS' },
-            ]}
-            searchable
-          />
-          <FormSelect
-            placeholder="All Status"
-            value={filters.isActive}
-            onChange={(e) => handleFilterChange('isActive', e.target.value)}
-            options={[
-              { label: 'Active', value: 'true' },
-              { label: 'Inactive', value: 'false' },
-            ]}
-          />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Search Bar */}
+        <div className="mb-8">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-4 py-3 pl-12 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            />
+            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            {searchTerm && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setCurrentPage(1);
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
+            )}
+          </div>
         </div>
-      </Card>
 
-      {/* Products Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="h-64 animate-pulse">
-              <div className="h-full bg-gray-100 rounded"></div>
-            </Card>
-          ))}
-        </div>
-      ) : products.length === 0 ? (
-        <Card className="text-center py-12">
-          <Package size={48} className="mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No products found</h3>
-          <p className="text-gray-600">Try adjusting your filters or add a new product</p>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {products.map((product) => (
-            <Card key={product.id} hover className="flex flex-col">
-              {/* Product Image */}
-              <div className="aspect-square bg-gray-100 rounded-lg mb-4 overflow-hidden">
-                {product.variants && product.variants.length > 0 && product.variants[0].images && product.variants[0].images.length > 0 ? (
-                  <img
-                    src={product.variants[0].images[0].url}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Package size={48} className="text-gray-400" />
-                  </div>
+        <div className="flex gap-8 relative">
+          {/* Mobile Backdrop */}
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/50 lg:hidden z-30"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
+          {/* Sidebar Filters */}
+          <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white shadow-xl transform transition-transform duration-300 lg:relative lg:inset-auto lg:z-auto lg:w-64 lg:shadow-none lg:transform-none ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+            <div className="h-full overflow-y-auto p-6 sticky top-0">
+              {/* Close Button for Mobile */}
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden mb-6 p-2 hover:bg-gray-100 rounded-lg transition-colors absolute top-4 right-4"
+                aria-label="Close filters"
+              >
+                <X size={24} />
+              </button>
+
+              <div className="flex items-center justify-between mb-6 mt-8 lg:mt-0">
+                <h3 className="text-lg font-bold text-slate-900">Filters</h3>
+                {hasActiveFilters && (
+                  <button
+                    onClick={() => {
+                      setFilters({
+                        category: '',
+                        gender: '',
+                        brand: '',
+                        color: '',
+                        size: '',
+                        minPrice: '',
+                        maxPrice: '',
+                      });
+                      setSearchTerm('');
+                      setCurrentPage(1);
+                    }}
+                    className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+                  >
+                    Clear All
+                  </button>
                 )}
               </div>
 
-              {/* Product Info */}
-              <div className="flex-1">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h3 className="font-semibold text-gray-900 line-clamp-2">
-                    {product.name}
-                  </h3>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${product.isActive
-                        ? 'bg-success-light text-success'
-                        : 'bg-gray-100 text-gray-700'
-                      }`}
-                  >
-                    {product.isActive ? 'Active' : 'Inactive'}
-                  </span>
+              {/* Category Filter */}
+              {filterOptions?.categories && (
+                <div className="mb-6 pb-6 border-b border-gray-200">
+                  <h4 className="font-semibold text-slate-900 mb-3">Category</h4>
+                  <div className="space-y-2">
+                    {filterOptions.categories.map(cat => (
+                      <label key={cat} className="flex items-center gap-3 cursor-pointer group">
+                        <input
+                          type="radio"
+                          name="category"
+                          value={cat}
+                          checked={filters.category === cat}
+                          onChange={(e) => handleFilterChange('category', e.target.value)}
+                          className="w-4 h-4 accent-orange-600"
+                        />
+                        <span className="text-sm text-gray-700 group-hover:text-gray-900">{cat}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
+              )}
 
-                <p className="text-sm text-gray-600 mb-1">{product.category}</p>
-                <p className="text-sm text-gray-600 capitalize mb-3">{product.gender}</p>
-                <p className="text-xl font-bold text-gray-900 mb-4">
-                  ₹{product.variants && product.variants.length > 0 ? Math.min(...product.variants.map(v => parseFloat(v.price) || 0)) : 0}
+              {/* Gender Filter */}
+              {filterOptions?.genders && (
+                <div className="mb-6 pb-6 border-b border-gray-200">
+                  <h4 className="font-semibold text-slate-900 mb-3">Gender</h4>
+                  <div className="space-y-2">
+                    {filterOptions.genders.map(gender => (
+                      <label key={gender} className="flex items-center gap-3 cursor-pointer group">
+                        <input
+                          type="radio"
+                          name="gender"
+                          value={gender}
+                          checked={filters.gender === gender}
+                          onChange={(e) => handleFilterChange('gender', e.target.value)}
+                          className="w-4 h-4 accent-orange-600"
+                        />
+                        <span className="text-sm text-gray-700 group-hover:text-gray-900">{gender}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Brand Filter */}
+              {filterOptions?.brands && (
+                <div className="mb-6 pb-6 border-b border-gray-200">
+                  <h4 className="font-semibold text-slate-900 mb-3">Brand</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {filterOptions.brands.map(brand => (
+                      <label key={brand} className="flex items-center gap-3 cursor-pointer group">
+                        <input
+                          type="radio"
+                          name="brand"
+                          value={brand}
+                          checked={filters.brand === brand}
+                          onChange={(e) => handleFilterChange('brand', e.target.value)}
+                          className="w-4 h-4 accent-orange-600"
+                        />
+                        <span className="text-sm text-gray-700 group-hover:text-gray-900">{brand}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Color Filter */}
+              {filterOptions?.colors && (
+                <div className="mb-6 pb-6 border-b border-gray-200">
+                  <h4 className="font-semibold text-slate-900 mb-3">Color</h4>
+                  <div className="space-y-2">
+                    {filterOptions.colors.map(color => (
+                      <label key={color} className="flex items-center gap-3 cursor-pointer group">
+                        <input
+                          type="radio"
+                          name="color"
+                          value={color}
+                          checked={filters.color === color}
+                          onChange={(e) => handleFilterChange('color', e.target.value)}
+                          className="w-4 h-4 accent-orange-600"
+                        />
+                        <span className="text-sm text-gray-700 group-hover:text-gray-900">{color}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Size Filter */}
+              {filterOptions?.sizes && (
+                <div className="mb-6 pb-6 border-b border-gray-200">
+                  <h4 className="font-semibold text-slate-900 mb-3">Size</h4>
+                  <div className="space-y-2">
+                    {filterOptions.sizes.map(size => (
+                      <label key={size} className="flex items-center gap-3 cursor-pointer group">
+                        <input
+                          type="radio"
+                          name="size"
+                          value={size}
+                          checked={filters.size === size}
+                          onChange={(e) => handleFilterChange('size', e.target.value)}
+                          className="w-4 h-4 accent-orange-600"
+                        />
+                        <span className="text-sm text-gray-700 group-hover:text-gray-900">{size}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Price Filter */}
+              <div>
+                <h4 className="font-semibold text-slate-900 mb-3">Price Range</h4>
+                <div className="flex gap-3">
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    value={filters.minPrice}
+                    onChange={(e) => handleFilterChange('minPrice', e.target.value)}
+                    className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    value={filters.maxPrice}
+                    onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
+                    className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {/* Main Content */}
+          <div className="flex-1">
+            {/* Top Bar */}
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="text-3xl font-black text-slate-900">Products</h1>
+                <p className="text-gray-600 mt-1">
+                  {loading ? 'Loading...' : `${products.length} products found`}
                 </p>
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-2 pt-4 border-t border-gray-100">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/products/${product.id}`)}
-                  className="flex-1 gap-2"
+              <div className="flex items-center gap-4">
+                <select
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
-                  <Edit2 size={16} />
-                  Edit
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => handleDelete(product.id)}
-                  className="gap-2"
-                >
-                  <Trash2 size={16} />
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+                  <option value="popular">Most Popular</option>
+                  <option value="newest">Newest</option>
+                  <option value="price-low">Price: Low to High</option>
+                  <option value="price-high">Price: High to Low</option>
+                </select>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-600">
-            Showing {pagination.skip + 1} to {Math.min(pagination.skip + pagination.take, pagination.total)} of{' '}
-            {pagination.total} products
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.skip === 0}
-              onClick={() =>
-                setPagination((prev) => ({
-                  ...prev,
-                  skip: Math.max(0, prev.skip - prev.take),
-                }))
-              }
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage >= totalPages}
-              onClick={() =>
-                setPagination((prev) => ({
-                  ...prev,
-                  skip: prev.skip + prev.take,
-                }))
-              }
-            >
-              Next
-            </Button>
+                <button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="lg:hidden px-4 py-2 bg-slate-900 text-white rounded-lg font-semibold"
+                >
+                  Filters
+                </button>
+              </div>
+            </div>
+
+            {/* Active Filters Display */}
+            {hasActiveFilters && (
+              <div className="mb-6 flex flex-wrap gap-2">
+                {searchTerm && (
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm">
+                    Search: {searchTerm}
+                    <button onClick={() => setSearchTerm('')} className="ml-1">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+                {activeFilters.map(([key, value]) => (
+                  <div key={key} className="inline-flex items-center gap-2 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm">
+                    {key}: {value}
+                    <button onClick={() => handleRemoveFilter(key)} className="ml-1">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Products Grid */}
+            {loading ? (
+              <div className="flex justify-center items-center min-h-96">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-600"></div>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="text-center py-16">
+                <Package size={64} className="mx-auto text-gray-400 mb-4" />
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">No products found</h3>
+                <p className="text-gray-600">Try adjusting your filters or search term</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-12">
+                  {products.map(product => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      isLiked={wishlist.includes(`${product.id}-${product.variants?.[0]?.id}`)}
+                      onToggleLike={(item) => handleToggleWishlist(item)}
+                      onAddToCart={(item) => handleAddToCart(item)}
+                    />
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                <div className="flex justify-center items-center gap-2 py-8">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Previous
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {[...Array(Math.ceil(products.length / itemsPerPage) || 1)].map((_, i) => {
+                      const page = i + 1;
+                      if (page === 1 || page === Math.ceil(products.length / itemsPerPage) || (page >= currentPage - 1 && page <= currentPage + 1)) {
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-10 h-10 rounded-lg font-semibold ${page === currentPage
+                              ? 'bg-orange-600 text-white'
+                              : 'border border-gray-300 hover:bg-gray-50'
+                              }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={products.length < itemsPerPage}
+                    className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
-      )}
+      </main>
     </div>
   );
 }

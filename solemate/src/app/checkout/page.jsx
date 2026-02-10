@@ -5,14 +5,15 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ArrowLeft, AlertCircle, Plus, CreditCard, Truck, CheckCircle, Edit2 } from 'lucide-react';
 import Header from '@/app/components/Header';
-import Footer from '@/app/components/Footer';
 import { cartApi, orderApi, addressApi, paymentApi } from '@/lib/api';
 import { useToast } from '@/components/ToastContext';
 import { CartLoadingSkeleton } from '@/components/LoadingSkeleton';
+import { useAuth } from '@/context/AuthContext';
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [cart, setCart] = useState([]);
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
@@ -42,13 +43,11 @@ export default function CheckoutPage() {
       try {
         setLoading(true);
 
-        // Check if user is logged in
-        const token = localStorage.getItem('token');
-        const loggedIn = !!token;
-        setIsGuest(!loggedIn);
+        // Use auth context to determine if user is logged in
+        setIsGuest(!isAuthenticated);
 
         // Fetch user's addresses if logged in
-        if (loggedIn) {
+        if (isAuthenticated) {
           try {
             const addressResponse = await addressApi.getAddresses();
             if (addressResponse) {
@@ -60,7 +59,6 @@ export default function CheckoutPage() {
             }
           } catch (err) {
             console.error('Error fetching addresses:', err);
-            showToast('Failed to load addresses', 'error');
           }
         }
 
@@ -83,7 +81,7 @@ export default function CheckoutPage() {
     };
 
     fetchData();
-  }, [router, showToast]);
+  }, [router, showToast, isAuthenticated]);
 
   const validateGuestAddress = () => {
     if (!guestAddress.name || !guestAddress.email || !guestAddress.phone || !guestAddress.addressLine1 ||
@@ -203,8 +201,8 @@ export default function CheckoutPage() {
             }
           },
           prefill: {
-            email: localStorage.getItem('userEmail') || '',
-            contact: isGuest ? guestAddress.phone : (localStorage.getItem('userPhone') || '')
+            email: guestAddress.email || '',
+            contact: isGuest ? guestAddress.phone : ''
           },
           theme: {
             color: '#FF6B6B'
@@ -247,7 +245,6 @@ export default function CheckoutPage() {
       <div className="min-h-screen bg-slate-50 flex flex-col">
         <Header />
         <CartLoadingSkeleton />
-        <Footer activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
     );
   }
@@ -268,7 +265,6 @@ export default function CheckoutPage() {
             </button>
           </div>
         </div>
-        <Footer activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
     );
   }
@@ -288,6 +284,37 @@ export default function CheckoutPage() {
           </button>
           <h1 className="text-3xl font-bold text-slate-900">Checkout</h1>
         </div>
+
+        {/* Login Prompt for Guest Users */}
+        {isGuest && (
+          <div className="mb-8 bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200 rounded-3xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="mt-1">
+                <CheckCircle size={24} className="text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-blue-900 mb-2">Faster Checkout with Login</h3>
+                <p className="text-blue-700 text-sm mb-4">
+                  Log in or create an account to enjoy faster checkout, saved addresses, order tracking, and exclusive offers.
+                </p>
+                <div className="flex gap-3 flex-wrap">
+                  <button
+                    onClick={() => router.push('/(auth)/login')}
+                    className="px-6 py-2 min-h-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors touch-manipulation active:scale-95"
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => router.push('/(auth)/signup')}
+                    className="px-6 py-2 min-h-10 bg-white hover:bg-blue-50 text-blue-600 font-semibold rounded-xl border-2 border-blue-200 transition-colors touch-manipulation active:scale-95"
+                  >
+                    Create Account
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
@@ -355,75 +382,137 @@ export default function CheckoutPage() {
 
               {isGuest ? (
                 /* Guest Address Form */
-                <div className="space-y-4">
-                  <p className="text-sm text-slate-600 mb-4">Please provide your delivery details:</p>
+                <div className="space-y-5">
+                  <p className="text-sm text-slate-600">Please provide your delivery details. We'll use this information to confirm your order and coordinate delivery.</p>
 
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      placeholder="Full Name *"
-                      value={guestAddress.name}
-                      onChange={(e) => setGuestAddress({ ...guestAddress, name: e.target.value })}
-                      className="px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                    <input
-                      type="email"
-                      placeholder="Email Address *"
-                      value={guestAddress.email}
-                      onChange={(e) => setGuestAddress({ ...guestAddress, email: e.target.value })}
-                      className="px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
+                  {/* Contact Information Section */}
+                  <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-200">
+                    <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                      <CreditCard size={18} className="text-orange-600" />
+                      Contact Information
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">
+                            Full Name *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Enter your full name"
+                            value={guestAddress.name}
+                            onChange={(e) => setGuestAddress({ ...guestAddress, name: e.target.value })}
+                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">
+                            Email Address *
+                          </label>
+                          <input
+                            type="email"
+                            placeholder="you@example.com"
+                            value={guestAddress.email}
+                            onChange={(e) => setGuestAddress({ ...guestAddress, email: e.target.value })}
+                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                          <p className="text-xs text-slate-500 mt-1">📧 We'll send order confirmation and tracking updates here</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-900 mb-2">
+                          Phone Number (10 digits) *
+                        </label>
+                        <input
+                          type="tel"
+                          placeholder="98765 43210"
+                          value={guestAddress.phone}
+                          onChange={(e) => setGuestAddress({ ...guestAddress, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">📱 Our delivery partner will contact you using this number for coordination</p>
+                      </div>
+                    </div>
                   </div>
 
-                  <input
-                    type="tel"
-                    placeholder="Phone Number (10 digits) *"
-                    value={guestAddress.phone}
-                    onChange={(e) => setGuestAddress({ ...guestAddress, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
+                  {/* Delivery Address Section */}
+                  <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-200">
+                    <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                      <Truck size={18} className="text-orange-600" />
+                      Delivery Address
+                    </h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-900 mb-2">
+                          Street Address Line 1 *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., 123 Main Street"
+                          value={guestAddress.addressLine1}
+                          onChange={(e) => setGuestAddress({ ...guestAddress, addressLine1: e.target.value })}
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
 
-                  <input
-                    type="text"
-                    placeholder="Address Line 1 *"
-                    value={guestAddress.addressLine1}
-                    onChange={(e) => setGuestAddress({ ...guestAddress, addressLine1: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-900 mb-2">
+                          Street Address Line 2 (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Apartment, Suite, etc."
+                          value={guestAddress.addressLine2}
+                          onChange={(e) => setGuestAddress({ ...guestAddress, addressLine2: e.target.value })}
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
 
-                  <input
-                    type="text"
-                    placeholder="Address Line 2 (Optional)"
-                    value={guestAddress.addressLine2}
-                    onChange={(e) => setGuestAddress({ ...guestAddress, addressLine2: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <input
-                      type="text"
-                      placeholder="City *"
-                      value={guestAddress.city}
-                      onChange={(e) => setGuestAddress({ ...guestAddress, city: e.target.value })}
-                      className="px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="State *"
-                      value={guestAddress.state}
-                      onChange={(e) => setGuestAddress({ ...guestAddress, state: e.target.value })}
-                      className="px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="PIN Code *"
-                      value={guestAddress.postalCode}
-                      onChange={(e) => setGuestAddress({ ...guestAddress, postalCode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                      className="px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">
+                            City *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g., Mumbai"
+                            value={guestAddress.city}
+                            onChange={(e) => setGuestAddress({ ...guestAddress, city: e.target.value })}
+                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">
+                            State *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g., Maharashtra"
+                            value={guestAddress.state}
+                            onChange={(e) => setGuestAddress({ ...guestAddress, state: e.target.value })}
+                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">
+                            PIN Code *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g., 400001"
+                            value={guestAddress.postalCode}
+                            onChange={(e) => setGuestAddress({ ...guestAddress, postalCode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <p className="text-xs text-slate-500 mt-2">* Required fields</p>
+                  <p className="text-xs text-slate-500 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    ⚠️ <span className="font-semibold">Please verify your details carefully</span> - Errors may cause delivery issues or order cancellation.
+                  </p>
                 </div>
               ) : addresses.length === 0 ? (
                 /* No Addresses */
@@ -448,14 +537,14 @@ export default function CheckoutPage() {
                         key={address.id}
                         onClick={() => setSelectedAddressId(address.id)}
                         className={`w-full p-4 border-2 rounded-2xl cursor-pointer transition-all text-left min-h-11 touch-manipulation active:scale-[0.98] ${selectedAddressId === address.id
-                            ? 'border-orange-500 bg-white shadow-md'
-                            : 'border-slate-200 hover:border-orange-300 bg-white hover:bg-slate-50'
+                          ? 'border-orange-500 bg-white shadow-md'
+                          : 'border-slate-200 hover:border-orange-300 bg-white hover:bg-slate-50'
                           }`}
                       >
                         <div className="flex gap-3 items-start">
                           <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${selectedAddressId === address.id
-                              ? 'border-orange-500 bg-orange-500'
-                              : 'border-slate-300'
+                            ? 'border-orange-500 bg-orange-500'
+                            : 'border-slate-300'
                             }`}>
                             {selectedAddressId === address.id && (
                               <div className="w-2 h-2 bg-white rounded-full"></div>
@@ -503,14 +592,14 @@ export default function CheckoutPage() {
                 <button
                   onClick={() => setPaymentMethod('RAZORPAY')}
                   className={`w-full p-4 border-2 rounded-xl cursor-pointer transition-all text-left min-h-11 touch-manipulation active:scale-[0.98] ${paymentMethod === 'RAZORPAY'
-                      ? 'border-orange-500 bg-slate-50 shadow-md'
-                      : 'border-slate-200 hover:border-orange-300 bg-white hover:bg-slate-50'
+                    ? 'border-orange-500 bg-slate-50 shadow-md'
+                    : 'border-slate-200 hover:border-orange-300 bg-white hover:bg-slate-50'
                     }`}
                 >
                   <div className="flex gap-3 items-center">
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${paymentMethod === 'RAZORPAY'
-                        ? 'border-orange-500 bg-orange-500'
-                        : 'border-slate-300'
+                      ? 'border-orange-500 bg-orange-500'
+                      : 'border-slate-300'
                       }`}>
                       {paymentMethod === 'RAZORPAY' && (
                         <div className="w-2 h-2 bg-white rounded-full"></div>
@@ -529,14 +618,14 @@ export default function CheckoutPage() {
                 <button
                   onClick={() => setPaymentMethod('COD')}
                   className={`w-full p-4 border-2 rounded-xl cursor-pointer transition-all text-left min-h-11 touch-manipulation active:scale-[0.98] ${paymentMethod === 'COD'
-                      ? 'border-orange-500 bg-slate-50 shadow-md'
-                      : 'border-slate-200 hover:border-orange-300 bg-white hover:bg-slate-50'
+                    ? 'border-orange-500 bg-slate-50 shadow-md'
+                    : 'border-slate-200 hover:border-orange-300 bg-white hover:bg-slate-50'
                     }`}
                 >
                   <div className="flex gap-3 items-center">
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${paymentMethod === 'COD'
-                        ? 'border-orange-500 bg-orange-500'
-                        : 'border-slate-300'
+                      ? 'border-orange-500 bg-orange-500'
+                      : 'border-slate-300'
                       }`}>
                       {paymentMethod === 'COD' && (
                         <div className="w-2 h-2 bg-white rounded-full"></div>
@@ -609,8 +698,6 @@ export default function CheckoutPage() {
           </div>
         </div>
       </main>
-
-      <Footer activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }

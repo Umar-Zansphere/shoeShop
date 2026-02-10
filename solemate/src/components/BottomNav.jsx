@@ -16,7 +16,7 @@ export default function BottomNav() {
 
     const navItems = [
         { href: '/', icon: Home, label: 'Home' },
-        { href: '/products', icon: Search, label: 'Explore' },
+        { href: '/explore', icon: Search, label: 'Explore' },
         { href: '/cart', icon: ShoppingBag, label: 'Cart' },
         { href: '/wishlist', icon: Heart, label: 'Wishlist' },
         { href: '/profile', icon: User, label: 'Profile' },

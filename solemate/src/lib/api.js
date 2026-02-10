@@ -1,3 +1,13 @@
+// Custom error class to include status code
+class ApiError extends Error {
+  constructor(message, status, data = null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+  }
+}
+
 const makeRequest = async (url, options = {}) => {
 
   const response = await fetch(`${url}`, {
@@ -9,9 +19,15 @@ const makeRequest = async (url, options = {}) => {
     ...options,
   });
 
+  // Handle 401 Unauthorized - user not authenticated
+  if (response.status === 401) {
+    const error = new ApiError('Unauthorized', 401);
+    throw error;
+  }
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(error.message || `API error: ${response.status}`);
+    throw new ApiError(error.message || `API error: ${response.status}`, response.status, error);
   }
 
   return response.json();
@@ -194,142 +210,7 @@ export const wishlistApi = {
 
   moveToCart: (wishlistItemId) =>
     makeRequest(`/api/wishlist/${wishlistItemId}/move-to-cart`, {
-      method: 'POST',
-      credentials: 'include',
     }),
-};
-
-// LocalStorage API - for non-logged-in users
-export const storageApi = {
-  // Cart storage
-  getCart: () => {
-    if (typeof window === 'undefined') return [];
-    const cart = localStorage.getItem('cart');
-    return cart ? JSON.parse(cart) : [];
-  },
-
-  addToCart: (item) => {
-    if (typeof window === 'undefined') return;
-    const cart = storageApi.getCart();
-    const existingItem = cart.find(i => i.variantId === item.variantId);
-
-    if (existingItem) {
-      existingItem.quantity += item.quantity;
-    } else {
-      cart.push(item);
-    }
-    localStorage.setItem('cart', JSON.stringify(cart));
-  },
-
-  removeFromCart: (itemId) => {
-    if (typeof window === 'undefined') return;
-    const cart = storageApi.getCart();
-    const filtered = cart.filter(item => item.id !== itemId);
-    localStorage.setItem('cart', JSON.stringify(filtered));
-  },
-
-  updateCartItem: (itemId, quantity) => {
-    if (typeof window === 'undefined') return;
-    const cart = storageApi.getCart();
-    const item = cart.find(i => i.id === itemId);
-    if (item) {
-      item.quantity = quantity;
-      localStorage.setItem('cart', JSON.stringify(cart));
-    }
-  },
-
-  clearCart: () => {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem('cart');
-  },
-
-  // Wishlist storage
-  getWishlist: () => {
-    if (typeof window === 'undefined') return [];
-    const wishlist = localStorage.getItem('wishlist');
-    return wishlist ? JSON.parse(wishlist) : [];
-  },
-
-  addToWishlist: (item) => {
-    if (typeof window === 'undefined') return;
-    const wishlist = storageApi.getWishlist();
-    const exists = wishlist.find(w => w.productId === item.productId && w.variantId === item.variantId);
-    if (!exists) {
-      wishlist.push(item);
-      localStorage.setItem('wishlist', JSON.stringify(wishlist));
-    }
-  },
-
-  removeFromWishlist: (itemId) => {
-    if (typeof window === 'undefined') return;
-    const wishlist = storageApi.getWishlist();
-    // Remove by both id and variantId to handle different ID formats
-    const filtered = wishlist.filter(item => item.id !== itemId && !itemId.includes(item.variantId));
-    localStorage.setItem('wishlist', JSON.stringify(filtered));
-  },
-
-  clearWishlist: () => {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem('wishlist');
-  },
-};
-
-// Migration API - move localStorage data to database after login
-export const migrationApi = {
-  migrateCart: async () => {
-    try {
-      const cart = storageApi.getCart();
-      console.log('Migrating cart:', cart);
-      if (cart.length === 0) {
-        console.log('No cart items to migrate');
-        return;
-      }
-
-      // Add each item to database cart
-      for (const item of cart) {
-        await cartApi.addToCart(item.variantId, item.quantity);
-      }
-
-      // Clear localStorage cart
-      storageApi.clearCart();
-      console.log('Successfully migrated cart to database');
-    } catch (err) {
-      console.error('Error migrating cart:', err);
-      // Keep localStorage cart intact if migration fails
-    }
-  },
-
-  migrateWishlist: async () => {
-    try {
-      const wishlist = storageApi.getWishlist();
-      console.log('Migrating wishlist:', wishlist);
-      if (wishlist.length === 0) {
-        console.log('No wishlist items to migrate');
-        return;
-      }
-
-      // Add each item to database wishlist
-      for (const item of wishlist) {
-        console.log('Adding to database wishlist:', item);
-        await wishlistApi.addToWishlist(item.productId, item.variantId || null);
-      }
-
-      // Clear localStorage wishlist
-      storageApi.clearWishlist();
-      console.log('Successfully migrated wishlist to database');
-    } catch (err) {
-      console.error('Error migrating wishlist:', err);
-      // Keep localStorage wishlist intact if migration fails
-    }
-  },
-
-  // Migrate both cart and wishlist
-  migrateAll: async () => {
-    console.log('Starting migration of localStorage data to database');
-    await migrationApi.migrateCart();
-    await migrationApi.migrateWishlist();
-    console.log('Migration completed');
-  },
 };
 
 // Order API - Customer-facing order endpoints
@@ -345,7 +226,7 @@ export const orderApi = {
 
   // Create guest order with address data
   createGuestOrder: async (addressData, paymentMethod) => {
-    return makeRequest('/api/orders/guest', {
+    return makeRequest('/api/orders', {
       method: 'POST',
       credentials: 'include',
       body: JSON.stringify({ address: addressData, paymentMethod })
@@ -387,19 +268,10 @@ export const orderApi = {
     });
   },
 
-  // Request tracking OTP for guest orders
-  requestTrackingOTP: async (orderNumber, email) => {
-    return makeRequest('/api/orders/track/request', {
-      method: 'POST',
-      body: JSON.stringify({ orderNumber, email })
-    });
-  },
-
-  // Verify tracking OTP for guest orders
-  verifyTrackingOTP: async (email, otp) => {
-    return makeRequest('/api/orders/track/verify', {
-      method: 'POST',
-      body: JSON.stringify({ email, otp })
+  // Track order by tracking token (public - no auth required)
+  trackOrderByToken: async (trackingToken) => {
+    return makeRequest(`/api/orders/track/${trackingToken}`, {
+      method: 'GET',
     });
   },
 };

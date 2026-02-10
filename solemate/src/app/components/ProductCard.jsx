@@ -4,19 +4,19 @@ import { Heart, Check, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import useCartStore from '@/store/cartStore';
+import useWishlistStore from '@/store/wishlistStore';
 
-export default function ProductCard({
-  product,
-  isLiked,
-  onToggleLike,
-  onAddToCart
-}) {
+export default function ProductCard({ product }) {
   const router = useRouter();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [cartAdded, setCartAdded] = useState(false);
-  const [wishlistAdded, setWishlistAdded] = useState(isLiked || false);
   const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Use stores
+  const { addToCart, isInCart } = useCartStore();
+  const { addToWishlist, removeItem, isInWishlist } = useWishlistStore();
 
   if (!product) return null;
 
@@ -28,57 +28,64 @@ export default function ProductCard({
   const category = product.category || "SHOES";
   const imageUrl = firstVariant?.images?.[0]?.url || product.image;
 
+  // Check if product is in wishlist (memoized to prevent re-renders)
+  const wishlistAdded = useMemo(() =>
+    isInWishlist(product.id, firstVariant?.id),
+    [isInWishlist, product.id, firstVariant?.id]
+  );
+
+  // Check if product is in cart (memoized to prevent re-renders)
+  const inCart = useMemo(() =>
+    firstVariant ? isInCart(firstVariant.id) : false,
+    [isInCart, firstVariant?.id]
+  );
+
   const handleAddToCart = async (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!firstVariant || isAddingToCart) return;
+    if (!firstVariant || isAddingToCart || inCart) return;
 
     setIsAddingToCart(true);
 
-    if (onAddToCart) {
-      try {
-        await onAddToCart({
-          variantId: firstVariant.id,
-          productId: product.id,
-          quantity: 1,
-          price: price
-        });
-        setCartAdded(true);
-        // Reset after 2 seconds
-        setTimeout(() => setCartAdded(false), 2000);
-      } catch (error) {
-        console.error('Error adding to cart:', error);
-      }
+    try {
+      await addToCart(firstVariant.id, 1);
+      setCartAdded(true);
+      setTimeout(() => setCartAdded(false), 2000);
+    } catch (error) {
+      console.error('Error adding to cart:', error);
     }
 
     setIsAddingToCart(false);
   };
 
-  const handleToggleLike = (e) => {
+  const handleToggleLike = async (e) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (!firstVariant) return;
 
-    if (onToggleLike) {
-      try {
-        onToggleLike({ productId: product.id, variantId: firstVariant.id });
-        setWishlistAdded(!wishlistAdded);
-      } catch (error) {
-        console.error('Error toggling wishlist:', error);
+    try {
+      if (wishlistAdded) {
+        const wishlistItems = useWishlistStore.getState().items;
+        const item = wishlistItems.find(
+          w => w.productId === product.id && w.variantId === firstVariant.id
+        );
+        if (item) {
+          await removeItem(item.id);
+        }
+      } else {
+        await addToWishlist(product.id, firstVariant.id);
       }
+    } catch (error) {
+      console.error('Error toggling wishlist:', error);
     }
   };
 
   return (
     <Link href={`/product/${product.id}`} className="block h-full">
-      <div className="group flex flex-col h-full w-full bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 shadow-sm hover:shadow-xl hover:border-gray-200 transition-all duration-300 cursor-pointer">
-
-        {/* 1. Image Section */}
-        <div className="relative w-full aspect-square rounded-2xl overflow-hidden flex items-center justify-center mb-3 bg-gray-50">
-
-          {/* Wishlist Button - Top Right */}
+      <div className="group flex flex-col h-full w-full bg-white rounded-xl border border-gray-100 p-3 sm:p-4 shadow-sm hover:shadow-xl hover:border-gray-200 transition-all duration-300 cursor-pointer">
+        <div className="relative w-full aspect-square rounded-lg overflow-hidden flex items-center justify-center mb-3 bg-gray-50">
           <button
             onClick={handleToggleLike}
             className="absolute top-3 right-3 z-10 w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-sm border border-gray-200 hover:bg-white hover:scale-110 transition-all shadow-md active:scale-95 touch-manipulation"
@@ -90,9 +97,8 @@ export default function ProductCard({
             />
           </button>
 
-          {/* Product Image */}
           {imageUrl ? (
-            <div className="relative w-[90%] h-[90%]">
+            <div className="relative w-full h-full">
               {!imageLoaded && (
                 <div className="absolute inset-0 bg-gray-200 animate-pulse rounded-xl" />
               )}
@@ -100,7 +106,6 @@ export default function ProductCard({
                 src={imageUrl}
                 alt={product.name}
                 fill
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 className={`object-contain drop-shadow-2xl transition-all duration-500 ease-out group-hover:scale-110 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                 loading="lazy"
                 onLoad={() => setImageLoaded(true)}
@@ -113,56 +118,45 @@ export default function ProductCard({
           )}
         </div>
 
-        {/* 2. Content Section */}
         <div className="flex flex-col flex-1 px-1">
-
-          {/* Category Label */}
           <p className="text-gray-500 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider mb-1.5">
             {category}
           </p>
 
-          {/* Title */}
-          <h3 className="text-slate-900 font-bold text-sm sm:text-base leading-tight mb-2 line-clamp-2 min-h-[2.5rem] group-hover:text-orange-600 transition-colors" title={product.name}>
+          <h3 className="text-slate-900 font-bold text-sm sm:text-base leading-tight mb-2 line-clamp-2 min-h-10 group-hover:text-orange-600 transition-colors" title={product.name}>
             {product.name}
           </h3>
 
-          {/* Brand */}
           {product.brand && (
             <p className="text-gray-600 text-xs sm:text-sm font-semibold mb-2 truncate">
               {product.brand}
             </p>
           )}
 
-          {/* Price */}
-          <p className="text-slate-900 font-black text-lg sm:text-xl mb-3">
-            ₹{parseFloat(price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
+          <div className="mt-auto flex items-center justify-between gap-3">
+            <p className="text-slate-900 font-black text-lg sm:text-xl">
+              ₹{parseFloat(price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
 
-          {/* 3. Action Button */}
-          <div className="mt-auto">
             <button
               onClick={handleAddToCart}
-              disabled={isAddingToCart}
-              className={`w-full flex items-center justify-center gap-2 text-white text-xs sm:text-sm font-bold uppercase tracking-wide rounded-xl py-3.5 min-h-[44px] transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation ${cartAdded
-                  ? 'bg-green-500 hover:bg-green-600 shadow-green-500/20 scale-105'
-                  : 'bg-slate-900 hover:bg-slate-800 active:scale-95 shadow-slate-900/20'
+              disabled={isAddingToCart || inCart}
+              className={`-shrink-0 w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-lg transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation ${inCart
+                  ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20'
+                  : cartAdded
+                    ? 'bg-green-500 hover:bg-green-600 shadow-green-500/20 scale-110'
+                    : 'bg-slate-900 hover:bg-slate-800 active:scale-95 shadow-slate-900/20 text-white'
                 }`}
+              aria-label={inCart ? "In cart" : cartAdded ? "Added to cart" : "Add to cart"}
             >
-              {cartAdded ? (
-                <>
-                  <Check size={18} className="animate-in zoom-in-50 duration-200" />
-                  <span>Added!</span>
-                </>
+              {inCart ? (
+                <Check size={20} className="text-white" />
+              ) : cartAdded ? (
+                <Check size={20} className="animate-in zoom-in-50 duration-200" />
               ) : isAddingToCart ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Adding...</span>
-                </>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                <>
-                  <ShoppingCart size={18} />
-                  <span>Add to Cart</span>
-                </>
+                <ShoppingCart size={20} />
               )}
             </button>
           </div>

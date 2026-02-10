@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/app/components/Header';
-import Footer from '@/app/components/Footer';
 import LoginPrompt from '@/components/LoginPrompt';
 import { addressApi } from '@/lib/api';
 import {
@@ -50,13 +49,6 @@ export default function AddressesPage() {
   const fetchAddresses = async () => {
     try {
       setLoading(true);
-      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-
-      if (!isLoggedIn) {
-        // Don't redirect, just stop loading to show login prompt
-        setLoading(false);
-        return;
-      }
 
       const response = await addressApi.getAddresses();
       if (response.success || Array.isArray(response)) {
@@ -213,14 +205,12 @@ export default function AddressesPage() {
             <p className="text-slate-600">Loading addresses...</p>
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
 
-  // Show login prompt if not logged in
-  const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-  if (!isLoggedIn) {
+  // Show login prompt if addresses couldn't be loaded (not authenticated)
+  if (!loading && addresses.length === 0 && error) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
         <Header />
@@ -229,7 +219,6 @@ export default function AddressesPage() {
           message="Log in to save and manage your delivery addresses for faster checkout"
           showGuestOption={true}
         />
-        <Footer />
       </div>
     );
   }
@@ -564,8 +553,6 @@ export default function AddressesPage() {
           </div>
         )}
       </div>
-
-      <Footer />
     </div>
   );
 }

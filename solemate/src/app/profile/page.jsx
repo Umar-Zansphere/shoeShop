@@ -3,72 +3,34 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/app/components/Header';
-import Footer from '@/app/components/Footer';
-import { userApi, authApi } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import LoginPrompt from '@/components/LoginPrompt';
 import { AlertCircle, Loader, Package, Heart, MapPin, ChevronLeft, Sliders, LogOut, UserPen, ShoppingBag } from 'lucide-react';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { user, isLoading, logout: authLogout } = useAuth();
   const [logoutModal, setLogoutModal] = useState({ isOpen: false, type: null, message: '' });
-
-  // Fetch user profile on mount
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        setLoading(true);
-        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-
-        if (!isLoggedIn) {
-          router.push('/');
-          return;
-        }
-
-        const response = await userApi.getProfile();
-        if (response.success || response.id) {
-          const userData = response.success ? response.data : response;
-          setUser(userData);
-          setError(null);
-        } else {
-          setError('Failed to load profile');
-        }
-      } catch (err) {
-        setError(err.message || 'Failed to load profile');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, [router]);
 
   const handleLogout = async () => {
     try {
-      // 1. Call the API to invalidate session/cookie on server
-      await authApi.logout();
+      // Use auth context logout which handles everything
+      await authLogout();
 
-      // 2. Clear Client Storage
-      localStorage.clear();
-
-      // 3. Update Local State
-      setUser(null);
-
-      // 4. Show success modal
-      setLogoutModal({ 
-        isOpen: true, 
-        type: 'success', 
-        message: 'You have been logged out successfully!' 
+      // Show success modal
+      setLogoutModal({
+        isOpen: true,
+        type: 'success',
+        message: 'You have been logged out successfully!'
       });
     } catch (error) {
-      console.error('Logout API call failed:', error);
-      
+      console.error('Logout failed:', error);
+
       // Show error modal
-      setLogoutModal({ 
-        isOpen: true, 
-        type: 'error', 
-        message: 'Logout failed. Please try again.' 
+      setLogoutModal({
+        isOpen: true,
+        type: 'error',
+        message: 'Logout failed. Please try again.'
       });
     }
   };
@@ -78,7 +40,7 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
         <Header />
@@ -88,29 +50,18 @@ export default function ProfilePage() {
             <p className="text-slate-600">Loading profile...</p>
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen bg-slate-50">
         <Header />
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="text-center">
-            <AlertCircle className="mx-auto mb-4 text-red-600" size={48} />
-            <h1 className="text-2xl font-bold mb-2">Profile Not Found</h1>
-            <p className="text-slate-600 mb-4">Please log in to view your profile</p>
-            <button
-              onClick={() => router.push('/login')}
-              className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-medium transition"
-            >
-              Go to Login
-            </button>
-          </div>
-        </div>
-        <Footer />
+        <LoginPrompt
+          title="Profile Access Required"
+          message="Please log in to view and manage your profile"
+        />
       </div>
     );
   }
@@ -186,22 +137,20 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      <Footer />
 
       {/* Logout Modal */}
       {logoutModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          
+
           {/* Modal Content */}
           <div className="relative bg-white rounded-3xl shadow-2xl p-8 max-w-sm mx-4 animate-in fade-in zoom-in-95">
             {/* Icon */}
-            <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-6 ${
-              logoutModal.type === 'success' 
-                ? 'bg-green-100' 
-                : 'bg-red-100'
-            }`}>
+            <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-6 ${logoutModal.type === 'success'
+              ? 'bg-green-100'
+              : 'bg-red-100'
+              }`}>
               {logoutModal.type === 'success' ? (
                 <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -214,11 +163,10 @@ export default function ProfilePage() {
             </div>
 
             {/* Title */}
-            <h2 className={`text-center text-2xl font-bold mb-2 ${
-              logoutModal.type === 'success' 
-                ? 'text-slate-900' 
-                : 'text-red-600'
-            }`}>
+            <h2 className={`text-center text-2xl font-bold mb-2 ${logoutModal.type === 'success'
+              ? 'text-slate-900'
+              : 'text-red-600'
+              }`}>
               {logoutModal.type === 'success' ? 'Logout Successful' : 'Logout Failed'}
             </h2>
 
@@ -230,11 +178,10 @@ export default function ProfilePage() {
             {/* Button */}
             <button
               onClick={handleModalClose}
-              className={`w-full py-3 px-4 rounded-xl font-semibold text-white transition-colors ${
-                logoutModal.type === 'success'
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : 'bg-red-600 hover:bg-red-700'
-              }`}
+              className={`w-full py-3 px-4 rounded-xl font-semibold text-white transition-colors ${logoutModal.type === 'success'
+                ? 'bg-green-600 hover:bg-green-700'
+                : 'bg-red-600 hover:bg-red-700'
+                }`}
             >
               Go to Home
             </button>

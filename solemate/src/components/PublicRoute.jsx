@@ -3,19 +3,19 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { useAuth } from "@/context/AuthContext";
 
 export default function PublicRoute({ children }) {
   const router = useRouter();
+  const { user, isLoading } = useAuth();
   const [isPublic, setIsPublic] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("fullName");
-    const storedRole = localStorage.getItem("userRole");
+    if (isLoading) return;
 
-    if (storedUser) {
+    if (user) {
       // User is authenticated, redirect based on role
-      if (storedRole === "ADMIN") {
+      if (user.userRole === "ADMIN") {
         router.replace("/admin");
       } else {
         router.replace("/");
@@ -25,10 +25,9 @@ export default function PublicRoute({ children }) {
 
     // User is not authenticated, allow access to public route
     setIsPublic(true);
-    setLoading(false);
-  }, [router]);
+  }, [user, isLoading, router]);
 
-  if (loading) return <LoadingSkeleton />;
+  if (isLoading) return <LoadingSkeleton />;
 
   return isPublic ? children : null;
 }

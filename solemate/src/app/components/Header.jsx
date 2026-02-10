@@ -3,36 +3,29 @@
 import { Menu, Search, ShoppingBag, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { storageApi } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import useCartStore from '@/store/cartStore';
 import Sidebar from './Sidebar';
 
 export default function Header({
   onSidebarOpen,
   onCartOpen,
-  cart = [],
   onSearch,
   user
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [cartCount, setCartCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
 
+    // Use cart store for cart count
+  const { items: cartItems, fetchCart, getCartCount } = useCartStore();
+  const cartCount = getCartCount();
+
   // Calculate cart count - from API or localStorage
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      // User is logged in - use prop
-      const count = cart.reduce((a, b) => a + (b.quantity || 0), 0);
-      setCartCount(count);
-    } else {
-      // User is not logged in - use localStorage
-      const storedCart = storageApi.getCart();
-      const count = storedCart.reduce((a, b) => a + (b.quantity || 0), 0);
-      setCartCount(count);
-    }
-  }, [cart]);
+    fetchCart(); // Fetch cart from API on mount to sync with server
+  }, [fetchCart]);
 
   const handleSearch = (e) => {
     e.preventDefault();

@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/app/components/Header';
-import Footer from '@/app/components/Footer';
 import LoginPrompt from '@/components/LoginPrompt';
 import { userApi } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import {
   AlertCircle,
   CheckCircle,
@@ -15,8 +15,7 @@ import {
 
 export default function EditProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading, refreshUser } = useAuth();
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -26,39 +25,14 @@ export default function EditProfilePage() {
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
 
-  // Fetch user profile on mount
+  // Populate form when user data is available
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        setLoading(true);
-        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-
-        if (!isLoggedIn) {
-          // Don't redirect, just stop loading to show login prompt
-          setLoading(false);
-          return;
-        }
-
-        const response = await userApi.getProfile();
-        if (response.success || response.id) {
-          const userData = response.success ? response.data : response;
-          setUser(userData);
-          setFullName(userData.fullName || '');
-          setEmail(userData.email || '');
-          setPhoneNumber(userData.phone || '');
-          setError(null);
-        } else {
-          setError('Failed to load profile');
-        }
-      } catch (err) {
-        setError(err.message || 'Failed to load profile');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, [router]);
+    if (user) {
+      setFullName(user.fullName || '');
+      setEmail(user.email || '');
+      setPhoneNumber(user.phone || '');
+    }
+  }, [user]);
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -102,7 +76,8 @@ export default function EditProfilePage() {
       const response = await userApi.updatePhoneNumber(phoneNumber);
 
       if (response.success) {
-        setUser(response.data.user);
+        // Refresh user data from context
+        await refreshUser();
         setSuccessMessage('Phone number updated successfully');
         setTimeout(() => {
           setSuccessMessage('');
@@ -117,7 +92,7 @@ export default function EditProfilePage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
         <Header />
@@ -127,7 +102,6 @@ export default function EditProfilePage() {
             <p className="text-slate-600">Loading profile...</p>
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
@@ -141,7 +115,6 @@ export default function EditProfilePage() {
           message="Log in to update your personal information and preferences"
           showGuestOption={true}
         />
-        <Footer />
       </div>
     );
   }
@@ -285,8 +258,6 @@ export default function EditProfilePage() {
           </form>
         </div>
       </div>
-
-      <Footer />
     </div>
   );
 }

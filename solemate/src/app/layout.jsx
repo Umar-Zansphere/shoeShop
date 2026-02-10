@@ -2,6 +2,7 @@ import './globals.css';
 import { ToastProvider } from '../components/ToastContext';
 import Toast from '../components/Toast';
 import BottomNav from '../components/BottomNav';
+import { AuthProvider } from '@/context/AuthContext';
 
 export const metadata = {
   title: 'SoleMate - Premium Footwear',
@@ -20,13 +21,15 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body className="bg-[#FAFAF8]">
-        <ToastProvider>
-          <div className="mobile-container">
-            {children}
-          </div>
-          <BottomNav />
-          <Toast />
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <div className="mobile-container">
+              {children}
+            </div>
+            <BottomNav />
+            <Toast />
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );

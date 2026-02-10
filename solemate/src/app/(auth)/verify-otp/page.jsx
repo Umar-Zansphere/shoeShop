@@ -51,7 +51,7 @@ function VerifyContent() {
       setError('Please enter the complete 6-digit code');
       return;
     }
-    
+
     setError('');
     setLoading(true);
 
@@ -62,23 +62,14 @@ function VerifyContent() {
       } else {
         res = await authApi.phoneLoginVerify(phone, code);
       }
-      
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Verification failed');
       console.log('Verification successful:', data);
 
-      // Success
-      if(data.user.fullName){
-        localStorage.setItem('fullName', data.user.fullName);
-      }
-      localStorage.setItem('phone', data.user.phone);
-      localStorage.setItem('userRole', data.user.userRole);
-      localStorage.setItem('isLoggedIn', 'true');
-      
-      // Migrate localStorage data to database
-      await migrate();
-      
-      router.push('/'); 
+      // Authentication state is now managed via cookies set by the backend
+
+      router.push('/');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -101,8 +92,8 @@ function VerifyContent() {
     <div className="min-h-screen bg-(--background) flex flex-col">
       {/* Back Button */}
       <div className="pt-6 px-6">
-        <button 
-          onClick={() => router.back()} 
+        <button
+          onClick={() => router.back()}
           className="p-3 -ml-3 hover:bg-gray-100 rounded-full transition-colors duration-300"
         >
           <ChevronLeft size={24} className="text-(--text-primary)" />
@@ -112,12 +103,12 @@ function VerifyContent() {
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center px-4">
         <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          
-          <div className="flex justify-center mb-4">
-          <VerifyIllustration />
-        </div>
 
-        {/* Header */}
+          <div className="flex justify-center mb-4">
+            <VerifyIllustration />
+          </div>
+
+          {/* Header */}
           <div className="text-center space-y-4">
             <h1 className="text-2xl font-bold text-(--text-primary)">Verification Code</h1>
             <p className="text-(--text-secondary) text-sm px-4">
@@ -154,8 +145,8 @@ function VerifyContent() {
               Resend code in <span className="text-(--accent) font-bold">{timer}s</span>
             </p>
             {timer === 0 && (
-              <button 
-                onClick={handleResend} 
+              <button
+                onClick={handleResend}
                 className="text-(--accent) font-bold text-sm hover:underline transition-colors duration-300"
               >
                 Resend Code
@@ -195,15 +186,15 @@ const VerifyIllustration = () => (
   <svg width="200" height="180" viewBox="0 0 200 180" fill="none" xmlns="http://www.w3.org/2000/svg">
     {/* Background circle */}
     <circle cx="100" cy="90" r="85" fill="#F3F4F6" opacity="0.5" />
-    
+
     {/* Shield with checkmark */}
     <g transform="translate(55, 40)">
       {/* Shield outline */}
       <path d="M 45 10 L 85 25 L 85 60 Q 85 85 45 100 Q 5 85 5 60 L 5 25 Z" fill="none" stroke="#FF6B6B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      
+
       {/* Shield fill - lighter */}
       <path d="M 45 10 L 85 25 L 85 60 Q 85 85 45 100 Q 5 85 5 60 L 5 25 Z" fill="#FF6B6B" opacity="0.1" />
-      
+
       {/* Checkmark inside shield */}
       <g transform="translate(45, 50)">
         <path d="M 0 15 L 15 30 L 40 5" stroke="#FF6B6B" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -216,7 +207,7 @@ const VerifyIllustration = () => (
       <rect x="130" y="35" width="18" height="18" rx="2" fill="none" stroke="#1F2937" strokeWidth="1.5" />
       <path d="M 135 43 Q 135 40 138 40 Q 141 40 141 43" fill="none" stroke="#1F2937" strokeWidth="1.5" strokeLinecap="round" />
       <circle cx="138" cy="47" r="1.5" fill="#1F2937" />
-      
+
       {/* Lock icon bottom left */}
       <rect x="25" y="115" width="16" height="16" rx="2" fill="none" stroke="#1F2937" strokeWidth="1.5" opacity="0.5" />
       <path d="M 29 121 Q 29 118 32 118 Q 35 118 35 121" fill="none" stroke="#1F2937" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />

@@ -6,19 +6,7 @@ const { getOrCreateSession, generateSessionId } = require('../services/session.s
 
 const verifyToken = async (req, res, next) => {
   let token;
-
-  // 1. Check for Bearer token in Authorization header
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-  // 2. If not found, check for token in cookies
-  else if (req.cookies.accessToken) {
     token = req.cookies.accessToken;
-  }
-  // 3. Fallback to checking the query parameter (optional, but you had it before)
-  else if (req.query.token) {
-    token = req.query.token;
-  }
 
   if (!token) {
     return res.status(401).json({ message: 'Unauthorized: No token provided' });
@@ -59,19 +47,7 @@ const verifyToken = async (req, res, next) => {
  */
 const optionalAuth = async (req, res, next) => {
   let token;
-
-  // Check for Bearer token in Authorization header
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-  // Check for token in cookies
-  else if (req.cookies.accessToken) {
     token = req.cookies.accessToken;
-  }
-  // Fallback to query parameter
-  else if (req.query.token) {
-    token = req.query.token;
-  }
 
   // If no token, continue as guest
   if (!token) {
