@@ -1,11 +1,12 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircle, Package, Truck, Mail, Home } from 'lucide-react';
 import Header from '@/app/components/Header';
 
-export default function OrderConfirmationPage() {
+function OrderConfirmationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [orderData, setOrderData] = useState(null);
@@ -156,7 +157,7 @@ export default function OrderConfirmationPage() {
               <div>
                 <h3 className="font-bold text-amber-900 mb-2">Cash on Delivery</h3>
                 <p className="text-sm text-amber-800">
-                  Please have the exact amount (₹{parseFloat(orderData.totalAmount).toFixed(2)}) ready when our delivery agent arrives at your doorstep. 
+                  Please have the exact amount (₹{parseFloat(orderData.totalAmount).toFixed(2)}) ready when our delivery agent arrives at your doorstep.
                   We accept cash payment only.
                 </p>
               </div>
@@ -205,4 +206,22 @@ export default function OrderConfirmationPage() {
       </main>
     </div>
   );
+}
+
+export default function OrderConfirmationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    }>
+      <OrderConfirmationContent />
+    </Suspense>
+  );
+
 }

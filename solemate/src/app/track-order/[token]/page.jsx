@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams, useParams } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { Package, CheckCircle } from 'lucide-react';
 import Header from '@/app/components/Header';
 import { orderApi } from '@/lib/api';
@@ -221,17 +221,16 @@ export default function TrackOrderPage() {
                                                 <div className="flex justify-between items-start mb-3">
                                                     <div>
                                                         <p className="font-semibold text-gray-900">Shipment {idx + 1}</p>
-                                                        <span className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-medium ${
-                                                            shipment.status === 'SHIPPED' ? 'bg-purple-100 text-purple-800' :
-                                                            shipment.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
-                                                            shipment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                                                            'bg-gray-100 text-gray-800'
-                                                        }`}>
+                                                        <span className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-medium ${shipment.status === 'SHIPPED' ? 'bg-purple-100 text-purple-800' :
+                                                                shipment.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
+                                                                    shipment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                                                        'bg-gray-100 text-gray-800'
+                                                            }`}>
                                                             {shipment.status}
                                                         </span>
                                                     </div>
                                                 </div>
-                                                
+
                                                 {shipment.courierName && (
                                                     <div className="mb-3">
                                                         <p className="text-sm text-gray-600"><span className="font-semibold">Courier:</span> {shipment.courierName}</p>

@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, ChevronDown, X, Package } from 'lucide-react';
@@ -7,7 +8,7 @@ import Header from '@/app/components/Header';
 import ProductCard from '@/app/components/ProductCard';
 import { productApi, cartApi, wishlistApi } from '@/lib/api';
 
-export default function ProductsPage() {
+function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -553,5 +554,17 @@ export default function ProductsPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-600"></div>
+      </div>
+    }>
+      <ProductsContent />
+    </Suspense>
   );
 }

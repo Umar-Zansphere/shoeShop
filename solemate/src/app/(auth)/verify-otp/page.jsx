@@ -177,7 +177,9 @@ function VerifyContent() {
 export default function VerifyOtpPage() {
   return (
     <PublicRoute>
-      <VerifyContent />
+      <Suspense fallback={<div className="min-h-screen bg-(--background) flex items-center justify-center">Loading...</div>}>
+        <VerifyContent />
+      </Suspense>
     </PublicRoute>
   );
 }

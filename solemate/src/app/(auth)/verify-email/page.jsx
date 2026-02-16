@@ -52,7 +52,7 @@ function VerifyEmailContent() {
   return (
     <div className="min-h-screen bg-(--background) flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 text-center">
-        
+
         {/* Illustration Area */}
         <div className="flex justify-center mb-6">
           <EmailVerificationIllustration status={status} />
@@ -60,7 +60,7 @@ function VerifyEmailContent() {
 
         {/* Content Area */}
         <div className="bg-white/50 backdrop-blur-sm p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-          
+
           {/* Status Header */}
           <div className="space-y-2">
             <h1 className="text-2xl font-bold tracking-tight text-(--text-primary)">
@@ -76,14 +76,14 @@ function VerifyEmailContent() {
           {/* Action Buttons */}
           <div className="pt-2">
             {status === 'verifying' && (
-               <div className="flex justify-center text-(--accent)">
-                 <Loader2 className="animate-spin h-8 w-8" data-testid="loader-spin" />
-               </div>
+              <div className="flex justify-center text-(--accent)">
+                <Loader2 className="animate-spin h-8 w-8" data-testid="loader-spin" />
+              </div>
             )}
 
             {status === 'success' && (
-              <Button 
-                onClick={() => router.push('/login')} 
+              <Button
+                onClick={() => router.push('/login')}
                 variant="primary"
                 className="w-full"
               >
@@ -94,8 +94,8 @@ function VerifyEmailContent() {
 
             {status === 'error' && (
               <div className="space-y-3">
-                <Button 
-                  onClick={() => router.push('/login')} 
+                <Button
+                  onClick={() => router.push('/login')}
                   variant="outline"
                   className="w-full"
                 >
@@ -114,10 +114,14 @@ function VerifyEmailContent() {
   );
 }
 
+import { Suspense } from 'react';
+
 export default function VerifyEmailPage() {
   return (
     <PublicRoute>
-      <VerifyEmailContent />
+      <Suspense fallback={<div className="min-h-screen bg-(--background) flex items-center justify-center">Loading...</div>}>
+        <VerifyEmailContent />
+      </Suspense>
     </PublicRoute>
   );
 }
@@ -132,44 +136,44 @@ const EmailVerificationIllustration = ({ status }) => {
     <svg width="200" height="180" viewBox="0 0 200 180" fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Background circle */}
       <circle cx="100" cy="90" r="85" fill="#F3F4F6" opacity="0.5" />
-      
+
       {/* Floating Elements Group */}
       <g transform="translate(0, 10)">
-        
+
         {/* Envelope Base */}
         <rect x="60" y="65" width="80" height="60" rx="4" fill="white" stroke={secondaryColor} strokeWidth="2" />
-        
+
         {/* Envelope Flap */}
         <path d="M 60 65 L 100 95 L 140 65" stroke={secondaryColor} strokeWidth="2" strokeLinejoin="round" fill="none" />
-        
+
         {/* Dynamic Status Icon */}
         <g transform="translate(100, 95)">
-           <circle cx="0" cy="0" r="25" fill="white" stroke={mainColor} strokeWidth="2" />
-           
-           {status === 'verifying' && (
-             // Simple dots for loading
-             <g fill={mainColor}>
-               <circle cx="-10" cy="0" r="3" opacity="0.4">
-                 <animate attributeName="opacity" values="0.4;1;0.4" dur="1s" repeatCount="indefinite" begin="0s"/>
-               </circle>
-               <circle cx="0" cy="0" r="3" opacity="0.4">
-                 <animate attributeName="opacity" values="0.4;1;0.4" dur="1s" repeatCount="indefinite" begin="0.2s"/>
-               </circle>
-               <circle cx="10" cy="0" r="3" opacity="0.4">
-                 <animate attributeName="opacity" values="0.4;1;0.4" dur="1s" repeatCount="indefinite" begin="0.4s"/>
-               </circle>
-             </g>
-           )}
+          <circle cx="0" cy="0" r="25" fill="white" stroke={mainColor} strokeWidth="2" />
 
-           {status === 'success' && (
-             // Checkmark
-             <path d="M -8 1 L -2 7 L 8 -7" stroke={secondaryColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-           )}
+          {status === 'verifying' && (
+            // Simple dots for loading
+            <g fill={mainColor}>
+              <circle cx="-10" cy="0" r="3" opacity="0.4">
+                <animate attributeName="opacity" values="0.4;1;0.4" dur="1s" repeatCount="indefinite" begin="0s" />
+              </circle>
+              <circle cx="0" cy="0" r="3" opacity="0.4">
+                <animate attributeName="opacity" values="0.4;1;0.4" dur="1s" repeatCount="indefinite" begin="0.2s" />
+              </circle>
+              <circle cx="10" cy="0" r="3" opacity="0.4">
+                <animate attributeName="opacity" values="0.4;1;0.4" dur="1s" repeatCount="indefinite" begin="0.4s" />
+              </circle>
+            </g>
+          )}
 
-           {status === 'error' && (
-             // X Mark
-             <path d="M -7 -7 L 7 7 M 7 -7 L -7 7" stroke={mainColor} strokeWidth="3" strokeLinecap="round" />
-           )}
+          {status === 'success' && (
+            // Checkmark
+            <path d="M -8 1 L -2 7 L 8 -7" stroke={secondaryColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          )}
+
+          {status === 'error' && (
+            // X Mark
+            <path d="M -7 -7 L 7 7 M 7 -7 L -7 7" stroke={mainColor} strokeWidth="3" strokeLinecap="round" />
+          )}
         </g>
       </g>
 

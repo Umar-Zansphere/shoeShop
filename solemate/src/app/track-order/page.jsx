@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Package, CheckCircle } from 'lucide-react';
@@ -7,7 +8,7 @@ import Header from '@/app/components/Header';
 import { orderApi } from '@/lib/api';
 import { useToast } from '@/components/ToastContext';
 
-export default function TrackOrderPage() {
+function TrackOrderContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { showToast } = useToast();
@@ -145,14 +146,13 @@ export default function TrackOrderPage() {
                                 {/* Order Status */}
                                 <div className="bg-gray-50 rounded-xl p-4">
                                     <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Status</p>
-                                    <span className={`inline-block px-4 py-2 rounded-full text-sm font-bold border-2 ${
-                                        status === 'PENDING' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
-                                        status === 'PAID' ? 'bg-blue-100 text-blue-800 border-blue-300' :
-                                        status === 'SHIPPED' ? 'bg-purple-100 text-purple-800 border-purple-300' :
-                                        status === 'DELIVERED' ? 'bg-green-100 text-green-800 border-green-300' :
-                                        status === 'CANCELLED' ? 'bg-red-100 text-red-800 border-red-300' :
-                                        'bg-gray-100 text-gray-800 border-gray-300'
-                                    }`}>
+                                    <span className={`inline-block px-4 py-2 rounded-full text-sm font-bold border-2 ${status === 'PENDING' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                                            status === 'PAID' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                                                status === 'SHIPPED' ? 'bg-purple-100 text-purple-800 border-purple-300' :
+                                                    status === 'DELIVERED' ? 'bg-green-100 text-green-800 border-green-300' :
+                                                        status === 'CANCELLED' ? 'bg-red-100 text-red-800 border-red-300' :
+                                                            'bg-gray-100 text-gray-800 border-gray-300'
+                                        }`}>
                                         {order.status}
                                     </span>
                                 </div>
@@ -227,5 +227,20 @@ export default function TrackOrderPage() {
                 </div>
             </main>
         </div>
+    );
+}
+
+export default function TrackOrderPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 flex flex-col items-center justify-center">
+                <Header />
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="w-12 h-12 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin"></div>
+                </div>
+            </div>
+        }>
+            <TrackOrderContent />
+        </Suspense>
     );
 }
