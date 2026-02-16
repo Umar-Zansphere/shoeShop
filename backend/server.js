@@ -10,7 +10,11 @@ const app = express();
 app.set("trust proxy", 1); // Trust first proxy
 console.log("CLIENT_URL =", process.env.CLIENT_URL);
 app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  origin: [
+    "http://localhost:3000",
+    "https://shoe-shop-25gx.vercel.app",
+    "https://shoe-shop-8tbmbxp8p-umar-mohameds-projects-5295067c.vercel.app"
+  ],
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -42,5 +46,5 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on Port: ${PORT}`);
 });
