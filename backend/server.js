@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser');
 const notificationService = require('./api/services/notification.service');
+const prisma = require('./config/prisma.js');
 
 dotenv.config();
 
@@ -39,6 +40,15 @@ app.use((err, req, res, next) => {
   res.status(statusCode).json({ message });
 });
 
+app.get("/health", async (req, res) => {
+  try {
+    
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: "healthy", message: "Database connection OK ✅" });
+  } catch (error) {
+    res.status(503).json({ status: "unhealthy", message: "Database connection failed ❌", error: error.message });
+  }
+});
 
 app.get("/", (req, res) => {
   res.json({ message: "Backend running 🟢" });
