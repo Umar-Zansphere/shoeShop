@@ -168,10 +168,10 @@ export default function CartPage() {
 
                           {/* Quantity Selector */}
                           <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2 bg-slate-100 rounded-xl p-1">
+                            <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
                               <button
                                 onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                                className="p-2 hover:bg-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="p-1 hover:bg-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={item.quantity <= 1}
                               >
                                 <Minus size={16} />
@@ -181,7 +181,7 @@ export default function CartPage() {
                               </span>
                               <button
                                 onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                                className="p-2 hover:bg-white rounded-lg transition"
+                                className="p-1 hover:bg-white rounded-lg transition"
                               >
                                 <Plus size={16} />
                               </button>

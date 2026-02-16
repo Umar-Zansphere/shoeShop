@@ -63,6 +63,7 @@ export default function OrderDetailPage() {
             setError(null);
             const response = await orderApi.getOrderDetail(params.id);
             const orderData = response.success ? response.data : response;
+            console.log('Fetched order detail:', orderData);
             setOrder(orderData);
         } catch (err) {
             console.error('Error fetching order detail:', err);
@@ -91,7 +92,7 @@ export default function OrderDetailPage() {
     };
 
     const handleTrackOrder = () => {
-        router.push(`/track-order?orderId=${params.id}`);
+        router.push(`/track-order/${order.trackingToken || order.id}`);
     };
 
     const formatDate = (dateString) => {

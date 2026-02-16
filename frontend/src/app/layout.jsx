@@ -35,7 +35,7 @@ export default function AdminLayout({ children }) {
     }
   };
 
-  const isActive = (path) => pathname === path || (path !== '/admin' && pathname.startsWith(path));
+  const isActive = (path) => pathname === path || (path !== '/' && pathname.startsWith(path));
 
   const menuItems = [
     {
@@ -99,6 +99,7 @@ export default function AdminLayout({ children }) {
           )}
 
           {/* Sidebar */}
+          {pathname !== '/login' && (
           <aside
             className={`fixed lg:relative z-30 bg-gray-800 text-white transition-transform duration-300 ease-in-out transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
               } lg:translate-x-0 w-64 h-full shrink-0 flex flex-col`}
@@ -187,29 +188,32 @@ export default function AdminLayout({ children }) {
               </button>
             </div>
           </aside>
+          )}
 
           {/* Main Content */}
           <main className="flex-1 overflow-auto">
             {/* Top Bar */}
-            <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sticky top-0 z-10">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSidebarOpen(true)}
-                    className="lg:hidden p-2 -ml-2 text-gray-600"
-                  >
-                    <Menu size={24} />
-                  </button>
-                  <h2 className="text-xl md:text-2xl font-bold text-gray-800">Admin Panel</h2>
-                </div>
-                <div className="flex items-center gap-2">
-                  <NotificationBell />
-                  <Link href="/settings" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                    <Settings size={20} className="text-gray-600" />
-                  </Link>
+            {pathname !== '/login' && (
+              <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sticky top-0 z-10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSidebarOpen(true)}
+                      className="lg:hidden p-2 -ml-2 text-gray-600"
+                    >
+                      <Menu size={24} />
+                    </button>
+                    <h2 className="text-xl md:text-2xl font-bold text-gray-800">Admin Panel</h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <NotificationBell />
+                    <Link href="/settings" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                      <Settings size={20} className="text-gray-600" />
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Page Content */}
             <div className="p-4 sm:p-6">

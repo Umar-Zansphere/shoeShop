@@ -37,6 +37,9 @@ export default function SettingsPage() {
     const fetchPreferences = async () => {
         try {
             const response = await fetch('/api/notifications/preferences', {
+                headers: {
+                    'ngrok-skip-browser-warning': 'true',
+                },
                 credentials: 'include',
             });
             if (response.ok) {
@@ -103,6 +106,7 @@ export default function SettingsPage() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'ngrok-skip-browser-warning': 'true',
                 },
                 credentials: 'include',
                 body: JSON.stringify(preferences),

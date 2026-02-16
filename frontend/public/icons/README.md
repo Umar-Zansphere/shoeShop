@@ -4,7 +4,7 @@ This directory should contain the following icon files for PWA support:
 
 ## Required Icons
 
-1. **icon-192x192.png** (192x192 pixels)
+1. **manifest-icon-192.maskable.png** (192x192 pixels)
    - Standard Android icon
    - Used for home screen and app drawer
 

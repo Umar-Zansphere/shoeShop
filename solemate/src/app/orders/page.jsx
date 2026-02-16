@@ -50,7 +50,7 @@ export default function OrdersPage() {
             setLoading(true);
             setError(null);
             const response = await orderApi.getOrders();
-            const ordersList = response.success ? response.data : response;
+            const ordersList = response.data?.orders || [];
             setOrders(Array.isArray(ordersList) ? ordersList : []);
             setFilteredOrders(Array.isArray(ordersList) ? ordersList : []);
         } catch (err) {

@@ -1,6 +1,15 @@
 const notificationService = require('../services/notification.service');
 const prisma = require('../../config/prisma');
 
+const getVapidKey = (req, res) => {
+    const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+    if (!vapidPublicKey) {
+        return res.status(500).json({ message: 'VAPID keys not configured' });
+    }
+    res.status(200).json({ publicKey: vapidPublicKey });
+};
+
+
 // Subscribe to push notifications
 async function subscribe(req, res) {
     try {
@@ -94,8 +103,8 @@ async function sendNotification(req, res) {
         const payload = {
             title: notification.title,
             body: notification.body,
-            icon: notification.icon || '/icons/icon-192x192.png',
-            badge: notification.badge || '/icons/icon-192x192.png',
+            icon: notification.icon || '/icons/manifest-icon-192.maskable.png',
+            badge: notification.badge || '/icons/manifest-icon-192.maskable.png',
             url: notification.url || '/',
             data: notification.data || {}
         };
@@ -133,8 +142,8 @@ async function broadcastNotification(req, res) {
         const payload = {
             title: notification.title,
             body: notification.body,
-            icon: notification.icon || '/icons/icon-192x192.png',
-            badge: notification.badge || '/icons/icon-192x192.png',
+            icon: notification.icon || '/icons/manifest-icon-192.maskable.png',
+            badge: notification.badge || '/icons/manifest-icon-192.maskable.png',
             url: notification.url || '/',
             data: notification.data || {}
         };
@@ -316,7 +325,7 @@ async function sendTestNotification(req, res) {
             title: 'Test Notification',
             body: 'This is a test notification from SoleMate Admin',
             url: '/notifications',
-            icon: '/icons/icon-192x192.png'
+            icon: '/icons/manifest-icon-192.maskable.png'
         };
 
         const result = await notificationService.sendToUser(userId, payload);
@@ -353,5 +362,6 @@ module.exports = {
     markAsRead,
     getPreferences,
     updatePreferences,
-    sendTestNotification
+    sendTestNotification,
+    getVapidKey
 };

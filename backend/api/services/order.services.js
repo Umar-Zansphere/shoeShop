@@ -68,6 +68,12 @@ const cancelOrder = async (orderId, reason = '') => {
         note: `Order cancelled. ${reason}`
       }
     });
+
+    // Update Inventory table: decrement reserved
+    await prisma.inventory.update({
+      where: { variantId: item.variantId },
+      data: { reserved: { decrement: item.quantity } }
+    }).catch(err => console.error(`Failed to release inventory for variant ${item.variantId}:`, err));
   }
 
   return {
@@ -182,8 +188,9 @@ const createOrderFromCart = async (userId, orderData) => {
       }
     });
 
-    // Mark inventory as HOLD
+    // Mark inventory as HOLD and update Inventory table
     for (const item of cart.items) {
+      // Create log
       await tx.inventoryLog.create({
         data: {
           variantId: item.variantId,
@@ -193,9 +200,27 @@ const createOrderFromCart = async (userId, orderData) => {
           note: 'Order created, awaiting payment'
         }
       });
+
+      // Update Inventory table
+      const inventory = await tx.inventory.upsert({
+        where: { variantId: item.variantId },
+        update: { reserved: { increment: item.quantity } },
+        create: { variantId: item.variantId, quantity: 0, reserved: item.quantity }
+      });
+
+      // Check for low stock (threshold: 5)
+      const availableStock = inventory.quantity - inventory.reserved;
+      if (availableStock <= 5) {
+        // We can't await this inside the transaction if it interacts with external services or takes time, 
+        // but notificationService is just DB calls mostly. To be safe/faster, we can queue it or run it after transaction.
+        // For now, let's gather these promises and run them after.
+        // Actually, to keep it simple and since we need product info, let's just do it here or better yet, return a flag.
+        // NOTE: We don't want to fail the order if notification fails.
+        // We'll collect these check tasks.
+      }
     }
 
-    // Update cart status
+    // Update cart status (commented out in original, keeping it that way)
     // await tx.cart.update({
     //   where: { id: cart.id },
     //   data: { status: 'ORDERED' }
@@ -203,6 +228,20 @@ const createOrderFromCart = async (userId, orderData) => {
 
     return newOrder;
   });
+
+  // Check for low stock after transaction to avoid blocking/errors
+  try {
+    for (const item of cart.items) {
+      const inventory = await prisma.inventory.findUnique({ where: { variantId: item.variantId } });
+      if (inventory && (inventory.quantity - inventory.reserved) <= 5) {
+        const productName = item.variant.product.name;
+        const variantInfo = `${item.variant.color} / ${item.variant.size}`;
+        await notificationService.notifyLowStock(item.variant.productId, `${productName} (${variantInfo})`, inventory.quantity - inventory.reserved);
+      }
+    }
+  } catch (err) {
+    console.error('Error sending low stock notification:', err);
+  }
 
   // Get order address for email
   const orderAddress = await prisma.orderAddress.findFirst({
@@ -494,6 +533,20 @@ const createOrderFromCartAsGuest = async (sessionId, orderData) => {
     // Don't throw error - order creation should succeed even if notification fails
   }
 
+  // Check for low stock after transaction
+  try {
+    for (const item of cart.items) {
+      const inventory = await prisma.inventory.findUnique({ where: { variantId: item.variantId } });
+      if (inventory && (inventory.quantity - inventory.reserved) <= 5) {
+        const productName = item.variant.product.name;
+        const variantInfo = `${item.variant.color} / ${item.variant.size}`;
+        await notificationService.notifyLowStock(item.variant.productId, `${productName} (${variantInfo})`, inventory.quantity - inventory.reserved);
+      }
+    }
+  } catch (err) {
+    console.error('Error sending low stock notification for guest order:', err);
+  }
+
   return {
     orderId: order.id,
     orderNumber: order.orderNumber,
@@ -575,6 +628,7 @@ const getCustomerOrderDetail = async (userId, orderId) => {
     id: order.id,
     orderNumber: order.orderNumber,
     status: order.status,
+    trackingToken: order.trackingToken,
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,
     totalAmount: order.totalAmount,
@@ -681,6 +735,12 @@ const cancelCustomerOrder = async (userId, orderId, reason = '') => {
           note: `Order cancelled by customer. ${reason}`
         }
       });
+
+      // Update Inventory table: decrement reserved
+      await tx.inventory.update({
+        where: { variantId: item.variantId },
+        data: { reserved: { decrement: item.quantity } }
+      });
     }
 
     return updated;
@@ -784,8 +844,9 @@ const createGuestOrder = async (sessionId, addressData, paymentMethod) => {
       }
     });
 
-    // Mark inventory as HOLD
+    // Mark inventory as HOLD and update Inventory table
     for (const item of cart.items) {
+      // Create log
       await tx.inventoryLog.create({
         data: {
           variantId: item.variantId,
@@ -795,7 +856,15 @@ const createGuestOrder = async (sessionId, addressData, paymentMethod) => {
           note: 'Guest order created, awaiting payment'
         }
       });
+
+      // Update Inventory table
+      await tx.inventory.upsert({
+        where: { variantId: item.variantId },
+        update: { reserved: { increment: item.quantity } },
+        create: { variantId: item.variantId, quantity: 0, reserved: item.quantity }
+      });
     }
+
 
     return newOrder;
   });

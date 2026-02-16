@@ -39,6 +39,86 @@ export default function NotificationBell() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const [isSubscribed, setIsSubscribed] = useState(false);
+
+    // Check subscription status
+    useEffect(() => {
+        const checkSubscription = async () => {
+            if ('serviceWorker' in navigator && 'PushManager' in window) {
+                const registration = await navigator.serviceWorker.ready;
+                const subscription = await registration.pushManager.getSubscription();
+                setIsSubscribed(!!subscription);
+
+                // If permission is granted but not subscribed (cleared cookies etc), auto-subscribe
+                if (!subscription && Notification.permission === 'granted') {
+                    subscribeToPush();
+                }
+            }
+        };
+        checkSubscription();
+    }, []);
+
+    const subscribeToPush = async () => {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            const permission = await Notification.requestPermission();
+
+            if (permission === 'granted') {
+                const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BMk...'; // You should expose this env var
+
+                // We need to fetch the VAPID key from server if not hardcoded
+                // Ideally create an endpoint: GET /api/notifications/vapid-key
+                // For now assuming we can get it or use a placeholder to trigger the flow (logic structure)
+                // But let's act real: we need the key.
+
+                // Let's assume the component will fetch it? No, better to fetch from API.
+                const keyResponse = await fetch('/api/notifications/vapid-key', { headers: { 'ngrok-skip-browser-warning': 'true' }, credentials: 'include' });
+                // If endpoint doesn't exist yet, we might need to create it.
+                // Checking previous analysis... routes didn't show it.
+                // We should probably add it or hardcode if user provided (not provided).
+                // Let's rely on an endpoint we will create.
+
+                if (!keyResponse.ok) return;
+                const { publicKey } = await keyResponse.json();
+
+                const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(publicKey)
+                });
+
+                await fetch('/api/notifications/subscribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(subscription)
+                });
+
+                setIsSubscribed(true);
+            }
+        } catch (error) {
+            console.error('Failed to subscribe to push:', error);
+        }
+    };
+
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+            .replace(/\-/g, '+')
+            .replace(/_/g, '/');
+
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+
+
     const fetchNotifications = async () => {
         try {
             const response = await fetch('/api/notifications/history?limit=50', {
@@ -115,11 +195,19 @@ export default function NotificationBell() {
                     />
 
                     {/* Dropdown */}
-                    <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-xl border border-gray-200 z-20 max-h-[32rem] overflow-hidden flex flex-col">
+                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-gray-200 z-20 max-h-[32rem] overflow-hidden flex flex-col">
                         {/* Header */}
                         <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
                             <h3 className="font-semibold text-gray-900">Notifications</h3>
                             <div className="flex items-center gap-2">
+                                {!isSubscribed && (
+                                    <button
+                                        onClick={subscribeToPush}
+                                        className="text-xs text-primary hover:text-primary-dark font-medium mr-2"
+                                    >
+                                        Enable Push
+                                    </button>
+                                )}
                                 {unreadCount > 0 && (
                                     <span className="text-xs text-gray-600 bg-gray-200 px-2 py-1 rounded-full">
                                         {unreadCount} new

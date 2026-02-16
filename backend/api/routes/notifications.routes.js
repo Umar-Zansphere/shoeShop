@@ -3,8 +3,9 @@ const notificationsController = require('../controller/notifications.controller'
 const { verifyToken, verifyAdmin } = require('../middleware/admin.middleware');
 
 // Public routes
-router.post('/subscribe', notificationsController.subscribe);
-router.delete('/unsubscribe', notificationsController.unsubscribe);
+router.get('/vapid-key', notificationsController.getVapidKey);
+router.post('/subscribe', verifyToken, notificationsController.subscribe);
+router.delete('/unsubscribe',verifyToken, notificationsController.unsubscribe);
 
 // Admin routes - require authentication
 router.get('/history', verifyAdmin, notificationsController.getHistory);

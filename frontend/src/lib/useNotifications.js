@@ -224,8 +224,8 @@ export default function useNotifications() {
 
         await registration.showNotification('Test Notification', {
             body: 'This is a test notification from SoleMate',
-            icon: '/icons/icon-192x192.png',
-            badge: '/icons/icon-192x192.png',
+            icon: '/icons/manifest-icon-192.maskable.png',
+            badge: '/icons/manifest-icon-192.maskable.png',
             vibrate: [200, 100, 200],
             tag: 'test-notification',
             data: {
