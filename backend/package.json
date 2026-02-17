@@ -4,7 +4,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "seed": "node prisma/seed.js"
+    "seed": "npm run seed:admin && npm run seed:products",
+    "seed:admin": "node prisma/seedAdmin.js",
+    "seed:products": "node prisma/seedProducts.js"
   },
   "keywords": [],
   "author": "",
