@@ -47,7 +47,7 @@ export default function ProductCard({ product }) {
     try {
       await addToCart(firstVariant.id, 1);
       setCartAdded(true);
-      showToast('Added to cart', 'success');
+      // showToast('Added to cart', 'success');
       setTimeout(() => setCartAdded(false), 2000);
     } catch (error) {
       console.error('Error adding to cart:', error);
@@ -71,11 +71,11 @@ export default function ProductCard({ product }) {
         );
         if (item) {
           await removeItem(item.id);
-          showToast('Removed from wishlist', 'info');
+          // showToast('Removed from wishlist', 'info');
         }
       } else {
         await addToWishlist(product.id, firstVariant.id);
-        showToast('Added to wishlist', 'success');
+        // showToast('Added to wishlist', 'success');
       }
     } catch (error) {
       console.error('Error toggling wishlist:', error);

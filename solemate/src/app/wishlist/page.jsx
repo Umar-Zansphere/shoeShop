@@ -29,7 +29,7 @@ export default function WishlistPage() {
   const handleRemoveItem = async (itemId) => {
     try {
       await removeItem(itemId);
-      showToast('Item removed from wishlist', 'success');
+      // showToast('Item removed from wishlist', 'success');
     } catch (err) {
       console.error('Error removing item:', err);
       showToast('Failed to remove item', 'error');
@@ -49,7 +49,7 @@ export default function WishlistPage() {
       // Use moveToCart from wishlist store (removes from wishlist and adds to cart)
       await moveToCart(item.id);
 
-      showToast('Item moved to cart', 'success');
+      // showToast('Item moved to cart', 'success');
     } catch (err) {
       console.error('Error moving to cart:', err);
       showToast('Failed to move item to cart', 'error');
