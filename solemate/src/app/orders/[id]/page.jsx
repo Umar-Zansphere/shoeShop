@@ -329,22 +329,18 @@ export default function OrderDetailPage() {
                             <span>Subtotal</span>
                             <span>{formatPrice(order.subtotal || order.totalAmount)}</span>
                         </div>
-                        {order.shippingCost > 0 && (
-                            <div className="flex justify-between text-slate-700">
-                                <span>Shipping</span>
-                                <span>{formatPrice(order.shippingCost)}</span>
-                            </div>
-                        )}
-                        {order.tax > 0 && (
-                            <div className="flex justify-between text-slate-700">
-                                <span>Tax</span>
-                                <span>{formatPrice(order.tax)}</span>
-                            </div>
-                        )}
+                        <div className="flex justify-between text-slate-700">
+                            <span>Shipping</span>
+                            <span className="font-medium text-slate-900">₹40.00</span>
+                        </div>
+                        <div className="flex justify-between text-slate-700">
+                            <span>Tax</span>
+                            <span className="text-green-600 font-medium">Included</span>
+                        </div>
                         <div className="border-t border-slate-200 pt-2 mt-2">
                             <div className="flex justify-between text-lg font-bold text-slate-900">
                                 <span>Total</span>
-                                <span>{formatPrice(order.totalAmount)}</span>
+                                <span>{formatPrice(order.totalAmount + 40)}</span>
                             </div>
                         </div>
                         <div className="pt-2 border-t border-slate-200 mt-2">

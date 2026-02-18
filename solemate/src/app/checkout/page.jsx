@@ -144,15 +144,15 @@ export default function CheckoutPage() {
         const orderInfo = btoa(JSON.stringify({
           orderId: orderData.orderId,
           orderNumber: orderData.orderNumber,
-          totalAmount: orderData.totalAmount,
+          totalAmount: orderData.totalAmount + 40,
           paymentMethod: 'COD'
         }));
         router.push(`/order-confirmation?order=${orderInfo}`);
       } else if (paymentMethod === 'RAZORPAY') {
         // Initialize Razorpay payment
         const totalAmount = cart.reduce((sum, item) => sum + (parseFloat(item.unitPrice) * item.quantity), 0);
-        const taxAmount = totalAmount * 0.18;
-        const finalAmount = totalAmount + taxAmount;
+        const shippingFee = 40;
+        const finalAmount = totalAmount + shippingFee;
 
         const options = {
           key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
@@ -180,7 +180,7 @@ export default function CheckoutPage() {
                 const orderInfo = btoa(JSON.stringify({
                   orderId: orderData.orderId,
                   orderNumber: orderData.orderNumber,
-                  totalAmount: orderData.totalAmount,
+                  totalAmount: orderData.totalAmount + 40,
                   paymentMethod: 'RAZORPAY'
                 }));
 
@@ -239,6 +239,7 @@ export default function CheckoutPage() {
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + (parseFloat(item.unitPrice) * item.quantity), 0);
+  const shippingFee = 40;
 
   if (loading) {
     return (
@@ -299,13 +300,13 @@ export default function CheckoutPage() {
                 </p>
                 <div className="flex gap-3 flex-wrap">
                   <button
-                    onClick={() => router.push('/(auth)/login')}
+                    onClick={() => router.push('/login')}
                     className="px-6 py-2 min-h-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors touch-manipulation active:scale-95"
                   >
                     Login
                   </button>
                   <button
-                    onClick={() => router.push('/(auth)/signup')}
+                    onClick={() => router.push('/signup')}
                     className="px-6 py-2 min-h-10 bg-white hover:bg-blue-50 text-blue-600 font-semibold rounded-xl border-2 border-blue-200 transition-colors touch-manipulation active:scale-95"
                   >
                     Create Account
@@ -657,17 +658,17 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">Shipping</span>
-                  <span className="font-bold text-green-600">FREE</span>
+                  <span className="font-semibold text-slate-900">₹40.00</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Tax (18%)</span>
-                  <span className="font-semibold text-slate-900">₹{(cartTotal * 0.18).toFixed(2)}</span>
+                  <span className="text-slate-600">Tax</span>
+                  <span className="font-semibold text-green-600">Included</span>
                 </div>
 
                 <div className="border-t-2 border-slate-200 pt-4 flex justify-between items-center">
                   <span className="font-bold text-slate-900">Total</span>
                   <span className="text-3xl font-black text-orange-600">
-                    ₹{(cartTotal + cartTotal * 0.18).toFixed(2)}
+                    ₹{(cartTotal + shippingFee).toFixed(2)}
                   </span>
                 </div>
               </div>

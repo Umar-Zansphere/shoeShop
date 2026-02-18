@@ -48,8 +48,8 @@ export default function CartPage() {
 
   // Calculate totals using store helper
   const subtotal = getCartTotal();
-  const tax = subtotal * 0.18; // 18% GST
-  const total = subtotal + tax;
+  const shippingFee = 40;
+  const total = subtotal + shippingFee;
 
   // Handle checkout
   const handleCheckout = () => {
@@ -220,13 +220,13 @@ export default function CartPage() {
                     {/* Shipping */}
                     <div className="flex justify-between text-slate-700">
                       <span>Shipping</span>
-                      <span className="font-semibold text-green-600">Free</span>
+                      <span className="font-semibold text-slate-900">₹40.00</span>
                     </div>
 
                     {/* Tax */}
                     <div className="flex justify-between text-slate-700">
-                      <span>Tax (18% GST)</span>
-                      <span className="font-semibold">₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span>Tax</span>
+                      <span className="font-semibold text-green-600">Included</span>
                     </div>
 
                     {/* Divider */}

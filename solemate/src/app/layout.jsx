@@ -3,6 +3,7 @@ import { ToastProvider } from '../components/ToastContext';
 import Toast from '../components/Toast';
 import BottomNav from '../components/BottomNav';
 import { AuthProvider } from '@/context/AuthContext';
+import StoreInitializer from '@/components/StoreInitializer';
 
 export const metadata = {
   title: 'SoleMate - Premium Footwear',
@@ -22,6 +23,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="bg-[#FAFAF8]">
         <AuthProvider>
+          <StoreInitializer />
           <ToastProvider>
             <div className="mobile-container">
               {children}

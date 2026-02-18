@@ -88,6 +88,7 @@ function OrderConfirmationContent() {
             <div className="bg-slate-50 rounded-2xl p-4">
               <p className="text-sm text-slate-600 mb-2">Total Amount</p>
               <p className="text-3xl font-black text-slate-900">₹{parseFloat(orderData.totalAmount).toFixed(2)}</p>
+              <p className="text-xs text-slate-500 mt-1 font-medium">Includes Tax & Shipping</p>
             </div>
             <div className="bg-slate-50 rounded-2xl p-4">
               <p className="text-sm text-slate-600 mb-2">Payment Method</p>

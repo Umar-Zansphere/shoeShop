@@ -7,9 +7,11 @@ import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import useCartStore from '@/store/cartStore';
 import useWishlistStore from '@/store/wishlistStore';
+import { useToast } from '@/components/ToastContext';
 
 export default function ProductCard({ product }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [cartAdded, setCartAdded] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -51,12 +53,14 @@ export default function ProductCard({ product }) {
     try {
       await addToCart(firstVariant.id, 1);
       setCartAdded(true);
+      showToast('Added to cart', 'success');
       setTimeout(() => setCartAdded(false), 2000);
     } catch (error) {
       console.error('Error adding to cart:', error);
+      showToast(error.message || 'Failed to add to cart', 'error');
+    } finally {
+      setIsAddingToCart(false);
     }
-
-    setIsAddingToCart(false);
   };
 
   const handleToggleLike = async (e) => {
@@ -73,12 +77,15 @@ export default function ProductCard({ product }) {
         );
         if (item) {
           await removeItem(item.id);
+          showToast('Removed from wishlist', 'info');
         }
       } else {
         await addToWishlist(product.id, firstVariant.id);
+        showToast('Added to wishlist', 'success');
       }
     } catch (error) {
       console.error('Error toggling wishlist:', error);
+      showToast('Failed to update wishlist', 'error');
     }
   };
 
@@ -142,10 +149,10 @@ export default function ProductCard({ product }) {
               onClick={handleAddToCart}
               disabled={isAddingToCart || inCart}
               className={`-shrink-0 w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-lg transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation ${inCart
-                  ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20'
-                  : cartAdded
-                    ? 'bg-green-500 hover:bg-green-600 shadow-green-500/20 scale-110'
-                    : 'bg-slate-900 hover:bg-slate-800 active:scale-95 shadow-slate-900/20 text-white'
+                ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20'
+                : cartAdded
+                  ? 'bg-green-500 hover:bg-green-600 shadow-green-500/20 scale-110'
+                  : 'bg-slate-900 hover:bg-slate-800 active:scale-95 shadow-slate-900/20 text-white'
                 }`}
               aria-label={inCart ? "In cart" : cartAdded ? "Added to cart" : "Add to cart"}
             >

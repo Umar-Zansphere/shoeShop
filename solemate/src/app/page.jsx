@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ProductCard from './components/ProductCard';
-import { productApi, cartApi, wishlistApi } from '@/lib/api';
+import { productApi } from '@/lib/api';
 import { useToast } from '@/components/ToastContext';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton';
 import Link from 'next/link';
@@ -18,8 +18,6 @@ export default function Home() {
   const [authOpen, setAuthOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState(null);
-  const [cart, setCart] = useState([]);
-  const [wishlist, setWishlist] = useState(new Set());
 
   // Data fetching states
   const [products, setProducts] = useState([]);
@@ -43,65 +41,12 @@ export default function Home() {
     loadPopularProducts();
   }, [showToast]);
 
-  const toggleWishlist = async ({ productId, variantId }) => {
-    const isCurrentlyLiked = wishlist.has(productId);
-
-    try {
-      if (isCurrentlyLiked) {
-        // Remove from wishlist - need wishlist item ID
-        // For now, just update local state
-        setWishlist((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(productId);
-          return newSet;
-        });
-        showToast('Removed from wishlist', 'info');
-      } else {
-        // Add to wishlist
-        const response = await wishlistApi.addToWishlist(productId, variantId);
-        setWishlist((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(productId);
-          return newSet;
-        });
-        showToast(response.toast?.message || 'Added to wishlist', 'success');
-      }
-    } catch (error) {
-      console.error('Error toggling wishlist:', error);
-      showToast('Failed to update wishlist. Please try again.', 'error');
-    }
-  };
-
-  const handleAddToCart = async ({ variantId, productId, quantity = 1, price }) => {
-    try {
-      const response = await cartApi.addToCart(variantId, quantity);
-
-      // Update local cart state
-      setCart((prev) => {
-        const existing = prev.find(item => item.variantId === variantId);
-        if (existing) {
-          return prev.map(item =>
-            item.variantId === variantId
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
-          );
-        }
-        return [...prev, { variantId, productId, quantity, price }];
-      });
-
-      showToast(response.toast?.message || 'Added to cart', 'success');
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-      showToast('Failed to add to cart. Please try again.', 'error');
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white font-sans antialiased pb-32">
       <Header
         onSidebarOpen={() => setSidebarOpen(true)}
         onCartOpen={() => setCartOpen(true)}
-        cart={cart}
         user={user}
       />
 
@@ -167,9 +112,6 @@ export default function Home() {
                 <ProductCard
                   key={product.id}
                   product={product}
-                  isLiked={wishlist.has(product.id)}
-                  onToggleLike={toggleWishlist}
-                  onAddToCart={handleAddToCart}
                 />
               ))}
             </div>

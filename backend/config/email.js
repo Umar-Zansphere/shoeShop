@@ -1,16 +1,8 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const ejs = require('ejs');
 const path = require('path');
 
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: true, // true for 465, false for other ports
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendEmail = async (to, subject, template, data) => {
   try {
@@ -24,13 +16,19 @@ const sendEmail = async (to, subject, template, data) => {
     // Then, render the main layout, injecting the content
     const html = await ejs.renderFile(layoutPath, { body: content });
 
-    await transporter.sendMail({
+    const { data: emailData, error } = await resend.emails.send({
       from: process.env.EMAIL_FROM,
       to,
       subject,
       html,
     });
-    console.log(`Email sent successfully to: ${to} (Template: ${template})`)
+
+    if (error) {
+      console.error('Error sending email via Resend:', error);
+      throw new Error('Failed to send email.');
+    }
+
+    console.log(`Email sent successfully to: ${to} (Template: ${template}, ID: ${emailData.id})`)
   } catch (error) {
     console.error('Error sending email:', error);
     throw new Error('Failed to send email.');
