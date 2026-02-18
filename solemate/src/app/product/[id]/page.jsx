@@ -35,6 +35,10 @@ export default function ProductDetailsPage() {
   const addToWishlist = useWishlistStore((state) => state.addToWishlist);
   const removeFromWishlist = useWishlistStore((state) => state.removeItem);
 
+  // Calculate current variant first (needed for derived state)
+  const currentVariants = product?.variants?.filter(v => v.color === selectedColor) || [];
+  const currentVariant = currentVariants.find(v => v.size === selectedSize) || currentVariants[0];
+
   // Derived state
   const isLiked = wishlistItems.some(item => item.productId === productId);
   const cartItem = currentVariant ? cartItems.find(item => item.variantId === currentVariant.id) : null;
@@ -104,18 +108,16 @@ export default function ProductDetailsPage() {
     );
   }
 
-  const currentVariants = product.variants?.filter(v => v.color === selectedColor) || [];
-  const currentVariant = currentVariants.find(v => v.size === selectedSize) || currentVariants[0];
   const currentImages = currentVariant?.images || [];
   const currentImage = currentImages[selectedImageIndex]?.url || currentImages[0]?.url;
 
-  const uniqueColors = [...new Set(product.variants.map(v => v.color))];
-  const uniqueSizes = [...new Set(product.variants.map(v => v.size))];
+  const uniqueColors = [...new Set(product?.variants?.map(v => v.color) || [])];
+  const uniqueSizes = [...new Set(product?.variants?.map(v => v.size) || [])];
 
   const handleColorChange = (color) => {
     setSelectedColor(color);
     setSelectedImageIndex(0);
-    const variantsWithColor = product.variants.filter(v => v.color === color);
+    const variantsWithColor = product?.variants?.filter(v => v.color === color) || [];
     if (variantsWithColor.length > 0) {
       setSelectedSize(variantsWithColor[0].size);
     }
@@ -402,7 +404,7 @@ export default function ProductDetailsPage() {
                         ? 'border-[#FF6B6B] shadow-lg scale-105'
                         : 'border-gray-300 hover:border-gray-400 hover:shadow-md'
                         }`}>
-                        <img src={product.variants.find(v => v.color === color)?.images?.[0]?.url || ''} alt={color} className="w-full h-full object-cover" />
+                        <img src={product?.variants?.find(v => v.color === color)?.images?.[0]?.url || ''} alt={color} className="w-full h-full object-cover" />
                       </div>
                       <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                         {color}
