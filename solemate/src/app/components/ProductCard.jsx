@@ -4,7 +4,7 @@ import { Heart, Check, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import useCartStore from '@/store/cartStore';
 import useWishlistStore from '@/store/wishlistStore';
 import { useToast } from '@/components/ToastContext';
@@ -30,17 +30,11 @@ export default function ProductCard({ product }) {
   const category = product.category || "SHOES";
   const imageUrl = firstVariant?.images?.[0]?.url || product.image;
 
-  // Check if product is in wishlist (memoized to prevent re-renders)
-  const wishlistAdded = useMemo(() =>
-    isInWishlist(product.id, firstVariant?.id),
-    [isInWishlist, product.id, firstVariant?.id]
-  );
+  // Check if product is in wishlist directly from store state
+  const wishlistAdded = isInWishlist(product.id, firstVariant?.id);
 
-  // Check if product is in cart (memoized to prevent re-renders)
-  const inCart = useMemo(() =>
-    firstVariant ? isInCart(firstVariant.id) : false,
-    [isInCart, firstVariant?.id]
-  );
+  // Check if product is in cart directly from store state
+  const inCart = firstVariant ? isInCart(firstVariant.id) : false;
 
   const handleAddToCart = async (e) => {
     e.preventDefault();

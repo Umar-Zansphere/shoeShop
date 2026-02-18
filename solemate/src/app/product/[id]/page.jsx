@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Heart, Cart, Star, ShoppingCart, ChevronLeft, ChevronRight, Truck, RotateCcw, Shield, Check, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Heart, Cart, Star, ShoppingCart, ChevronLeft, ChevronRight, Truck, RotateCcw, Shield, Check, AlertCircle, Minus, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { productApi, cartApi, wishlistApi, storageApi } from '@/lib/api';
@@ -27,6 +27,9 @@ export default function ProductDetailsPage() {
 
   // Store hooks
   const addToCart = useCartStore((state) => state.addToCart);
+  const updateQuantity = useCartStore((state) => state.updateQuantity);
+  const removeFromCart = useCartStore((state) => state.removeItem);
+  const cartItems = useCartStore((state) => state.items);
   const cartCount = useCartStore((state) => state.getCartCount());
   const wishlistItems = useWishlistStore((state) => state.items);
   const addToWishlist = useWishlistStore((state) => state.addToWishlist);
@@ -34,6 +37,9 @@ export default function ProductDetailsPage() {
 
   // Derived state
   const isLiked = wishlistItems.some(item => item.productId === productId);
+  const cartItem = currentVariant ? cartItems.find(item => item.variantId === currentVariant.id) : null;
+  const isInCart = !!cartItem;
+  const cartItemQuantity = cartItem?.quantity || 0;
 
   // Fetch product details
   useEffect(() => {
@@ -151,6 +157,22 @@ export default function ProductDetailsPage() {
       setCartMessage({ type: 'error', text: err.message || 'Failed to add to cart' });
     } finally {
       setIsAddingToCart(false);
+    }
+  };
+
+  const handleUpdateQuantity = async (newQuantity) => {
+    if (!cartItem) return;
+
+    try {
+      if (newQuantity < 1) {
+        await removeFromCart(cartItem.id);
+        setCartMessage({ type: 'success', text: 'Removed from cart' });
+      } else {
+        await updateQuantity(cartItem.id, newQuantity);
+      }
+    } catch (err) {
+      console.error('Error updating quantity:', err);
+      setCartMessage({ type: 'error', text: 'Failed to update quantity' });
     }
   };
 
@@ -422,15 +444,36 @@ export default function ProductDetailsPage() {
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-3">
-              {/* Add to Cart Button */}
-              <button
-                onClick={handleAddToCart}
-                disabled={isAddingToCart}
-                className="w-full bg-linear-to-r from-[#FF6B6B] to-[#FF5252] text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-[#FF6B6B]/30 hover:shadow-2xl hover:shadow-[#FF6B6B]/40 hover:-translate-y-0.5 active:translate-y-1 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:active:translate-y-0"
-              >
-                <ShoppingCart size={22} strokeWidth={2.5} className={isAddingToCart ? 'animate-spin' : 'group-hover:animate-bounce'} />
-                {isAddingToCart ? 'Adding to Cart...' : 'Add to Cart'}
-              </button>
+              {/* Add to Cart Button or Quantity Selector */}
+              {isInCart ? (
+                <div className="flex items-center justify-between w-full bg-slate-900 text-white rounded-xl py-2 px-4 shadow-xl shadow-slate-900/20">
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => handleUpdateQuantity(cartItemQuantity - 1)}
+                      className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                    >
+                      {cartItemQuantity === 1 ? <Trash2 size={18} /> : <Minus size={18} />}
+                    </button>
+                    <span className="text-xl font-bold w-8 text-center">{cartItemQuantity}</span>
+                    <button
+                      onClick={() => handleUpdateQuantity(cartItemQuantity + 1)}
+                      className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                    >
+                      <Plus size={18} />
+                    </button>
+                  </div>
+                  <div className="font-semibold text-sm opacity-90">In Cart</div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleAddToCart}
+                  disabled={isAddingToCart}
+                  className="w-full bg-linear-to-r from-[#FF6B6B] to-[#FF5252] text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-[#FF6B6B]/30 hover:shadow-2xl hover:shadow-[#FF6B6B]/40 hover:-translate-y-0.5 active:translate-y-1 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:active:translate-y-0"
+                >
+                  <ShoppingCart size={22} strokeWidth={2.5} className={isAddingToCart ? 'animate-spin' : 'group-hover:animate-bounce'} />
+                  {isAddingToCart ? 'Adding to Cart...' : 'Add to Cart'}
+                </button>
+              )}
 
               {/* Wishlist Button - Secondary Action */}
               <button
